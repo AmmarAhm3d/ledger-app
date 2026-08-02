@@ -1,0 +1,108 @@
+<script lang="ts">
+	import { Paperclip } from '@lucide/svelte';
+
+	interface Props {
+		open: boolean;
+		retentionDays: number;
+		onClose: () => void;
+	}
+
+	let { open, retentionDays, onClose }: Props = $props();
+
+	let description = $state('');
+	let amount = $state('');
+	let category = $state('Housing');
+
+	function handleSave() {
+		onClose();
+		description = '';
+		amount = '';
+		category = 'Housing';
+	}
+</script>
+
+<svelte:window onkeydown={(e) => open && e.key === 'Escape' && onClose()} />
+
+{#if open}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		onclick={onClose}
+		role="presentation"
+		class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+	>
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div
+			onclick={(e) => e.stopPropagation()}
+			role="presentation"
+			class="flex w-108 flex-col gap-3.75 rounded-2xl border border-border-strong bg-panel-2 p-5 shadow-2xl"
+		>
+			<div>
+				<div class="text-[15.5px] font-semibold tracking-tight">Add transaction</div>
+				<div class="mt-0.5 text-[12.5px] text-muted">
+					Logged to your personal ledger with an audit entry.
+				</div>
+			</div>
+			<div class="flex flex-col gap-1.5">
+				<label for="tx-description" class="text-xs font-semibold text-dim">Description</label>
+				<input
+					id="tx-description"
+					bind:value={description}
+					placeholder="e.g. Whole Foods"
+					class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
+				/>
+			</div>
+			<div class="grid grid-cols-2 gap-3">
+				<div class="flex flex-col gap-1.5">
+					<label for="tx-amount" class="text-xs font-semibold text-dim">Amount</label>
+					<input
+						id="tx-amount"
+						bind:value={amount}
+						placeholder="Rs 0"
+						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
+					/>
+				</div>
+				<div class="flex flex-col gap-1.5">
+					<label for="tx-category" class="text-xs font-semibold text-dim">Category</label>
+					<select
+						id="tx-category"
+						bind:value={category}
+						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none"
+					>
+						<option>Housing</option>
+						<option>Food & Drink</option>
+						<option>Transport</option>
+						<option>Software</option>
+						<option>Health</option>
+					</select>
+				</div>
+			</div>
+			<div
+				class="flex cursor-pointer items-center gap-2.75 rounded-[10px] border border-dashed border-border-hover bg-panel px-3.75 py-3.75 transition-colors duration-150 hover:border-accent hover:bg-panel-2"
+			>
+				<Paperclip size={17} strokeWidth={1.9} class="text-subtle" />
+				<div>
+					<div class="text-[12.5px] font-semibold">Attach receipt image</div>
+					<div class="mt-0.5 text-[11.5px] text-muted">
+						Auto-deleted after {retentionDays} days
+					</div>
+				</div>
+			</div>
+			<div class="mt-0.5 flex justify-end gap-2.25">
+				<button
+					onclick={onClose}
+					class="rounded-[9px] border border-border-strong bg-transparent px-3.5 py-2 text-[13px] font-semibold text-ink transition-colors duration-100 hover:bg-panel-strong"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={handleSave}
+					class="rounded-[9px] bg-ink px-4 py-2 text-[13px] font-semibold text-bg transition-colors duration-150 hover:bg-dim"
+				>
+					Save transaction
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
