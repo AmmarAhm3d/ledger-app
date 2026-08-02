@@ -165,6 +165,18 @@ export const actions: Actions = {
 			return fail(400, { message: 'Missing required fields' });
 		}
 
+		const [ownedAccount] = await db
+			.select({ id: accounts.id })
+			.from(accounts)
+			.where(and(eq(accounts.id, accountId), eq(accounts.user_id, locals.user.id)));
+		if (!ownedAccount) return fail(400, { message: 'Invalid account' });
+
+		const [ownedCategory] = await db
+			.select({ id: categories.id })
+			.from(categories)
+			.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
+		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
+
 		let receiptUrl: string | null = null;
 		if (receipt instanceof File && receipt.size > 0) {
 			const extension = ALLOWED_RECEIPT_TYPES[receipt.type];
