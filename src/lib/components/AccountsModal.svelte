@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { formatPKR, initials } from '$lib/format';
 	import type { Account, AccountType } from '$lib/types';
@@ -7,32 +8,16 @@
 		open: boolean;
 		accounts: Account[];
 		onClose: () => void;
-		onUpdateAmount: (id: number, balance: number) => void;
-		onRemove: (id: number) => void;
-		onAdd: (name: string, type: AccountType, balance: number) => void;
+		errorMessage?: string;
 	}
 
-	let { open, accounts, onClose, onUpdateAmount, onRemove, onAdd }: Props = $props();
+	let { open, accounts, onClose, errorMessage }: Props = $props();
 
 	let newName = $state('');
 	let newType = $state<AccountType>('Bank');
 	let newAmount = $state('');
 
 	let total = $derived(accounts.reduce((sum, a) => sum + a.balance, 0));
-
-	function handleAmountChange(id: number, raw: string) {
-		const value = parseFloat(raw.replace(/[^0-9.-]/g, ''));
-		if (!isNaN(value)) onUpdateAmount(id, value);
-	}
-
-	function handleAdd() {
-		const value = parseFloat(newAmount.replace(/[^0-9.-]/g, ''));
-		if (!newName.trim() || isNaN(value)) return;
-		onAdd(newName.trim(), newType, value);
-		newName = '';
-		newAmount = '';
-		newType = 'Bank';
-	}
 </script>
 
 <svelte:window onkeydown={(e) => open && e.key === 'Escape' && onClose()} />
@@ -59,6 +44,12 @@
 				</div>
 			</div>
 
+			{#if errorMessage}
+				<div class="rounded-lg border border-red/40 bg-red/10 px-3 py-2 text-xs text-red">
+					{errorMessage}
+				</div>
+			{/if}
+
 			<div class="flex flex-col gap-2">
 				{#each accounts as account (account.id)}
 					<div
@@ -73,18 +64,33 @@
 							<div class="truncate text-[12.5px] font-semibold">{account.name}</div>
 							<div class="text-[11px] text-muted">{account.type}</div>
 						</div>
-						<input
-							value={String(account.balance)}
-							onchange={(e) => handleAmountChange(account.id, e.currentTarget.value)}
-							class="w-27.5 rounded-lg border border-border-strong bg-panel-2 px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
-						/>
-						<button
-							onclick={() => onRemove(account.id)}
-							title="Remove account"
-							class="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
-						>
-							<Trash2 size={13} strokeWidth={1.9} />
-						</button>
+						<form
+						method="POST"
+						action="?/updateAccountBalance"
+						use:enhance={() => {
+							return async ({ update }) => {
+								await update({ reset: false });
+							};
+						}}
+					>
+							<input type="hidden" name="id" value={account.id} />
+							<input
+								name="balance"
+								value={String(account.balance)}
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								class="w-27.5 rounded-lg border border-border-strong bg-panel-2 px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
+							/>
+						</form>
+						<form method="POST" action="?/removeAccount" use:enhance>
+							<input type="hidden" name="id" value={account.id} />
+							<button
+								type="submit"
+								title="Remove account"
+								class="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
+							>
+								<Trash2 size={13} strokeWidth={1.9} />
+							</button>
+						</form>
 					</div>
 				{/each}
 			</div>
@@ -94,15 +100,29 @@
 				<span class="font-mono text-[15px] font-semibold">{formatPKR(total)}</span>
 			</div>
 
-			<div class="flex flex-col gap-2.5 border-t border-border pt-3.5">
+			<form
+				method="POST"
+				action="?/addAccount"
+				use:enhance={() => {
+					return async ({ update }) => {
+						await update();
+						newName = '';
+						newAmount = '';
+						newType = 'Bank';
+					};
+				}}
+				class="flex flex-col gap-2.5 border-t border-border pt-3.5"
+			>
 				<div class="text-[12.5px] font-semibold">Add account</div>
 				<div class="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.3fr_1fr]">
 					<input
+						name="name"
 						bind:value={newName}
 						placeholder="e.g. Meezan Bank"
 						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
 					/>
 					<select
+						name="type"
 						bind:value={newType}
 						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none"
 					>
@@ -112,18 +132,19 @@
 					</select>
 				</div>
 				<input
+					name="balance"
 					bind:value={newAmount}
 					placeholder="Rs 0"
 					class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
 				/>
 				<button
-					onclick={handleAdd}
+					type="submit"
 					class="flex items-center justify-center gap-1.5 rounded-[9px] border border-dashed border-border-hover px-3 py-2.25 text-[12.5px] font-semibold text-dim transition-colors duration-100 hover:border-accent hover:bg-panel-hover"
 				>
 					<Plus size={13} strokeWidth={2.2} />
 					Add bank or wallet
 				</button>
-			</div>
+			</form>
 
 			<div class="mt-0.5 flex justify-end">
 				<button
