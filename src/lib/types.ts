@@ -27,5 +27,5 @@ export interface Transaction {
 	category: string;
 	date: string;
 	amount: number;
-	receiptDays: number;
+	hasReceipt: boolean;
 }

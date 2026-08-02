@@ -38,5 +38,6 @@ export const transactions = sqliteTable('transactions', {
 		.notNull()
 		.references(() => categories.id),
 	has_receipt: integer('has_receipt', { mode: 'boolean' }).notNull().default(false),
+	receipt_url: text('receipt_url'),
 	...timestamps
 });

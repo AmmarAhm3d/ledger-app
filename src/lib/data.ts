@@ -30,7 +30,7 @@ export const transactions: Transaction[] = [
 		category: 'Food & Drink',
 		date: 'Feb 14',
 		amount: -18.4,
-		receiptDays: 26
+		hasReceipt: true
 	},
 	{
 		name: 'Rent — 214 Kearny St',
@@ -38,7 +38,7 @@ export const transactions: Transaction[] = [
 		category: 'Housing',
 		date: 'Feb 12',
 		amount: -1840.0,
-		receiptDays: 24
+		hasReceipt: true
 	},
 	{
 		name: 'Vercel Pro',
@@ -46,7 +46,7 @@ export const transactions: Transaction[] = [
 		category: 'Software',
 		date: 'Feb 11',
 		amount: -20.0,
-		receiptDays: 0
+		hasReceipt: false
 	},
 	{
 		name: 'Payroll — Northwind',
@@ -54,7 +54,7 @@ export const transactions: Transaction[] = [
 		category: 'Income',
 		date: 'Feb 10',
 		amount: 4120.0,
-		receiptDays: 0
+		hasReceipt: false
 	},
 	{
 		name: 'Caltrain monthly',
@@ -62,7 +62,7 @@ export const transactions: Transaction[] = [
 		category: 'Transport',
 		date: 'Feb 09',
 		amount: -96.0,
-		receiptDays: 21
+		hasReceipt: true
 	},
 	{
 		name: 'Sutter Health copay',
@@ -70,7 +70,7 @@ export const transactions: Transaction[] = [
 		category: 'Health',
 		date: 'Feb 08',
 		amount: -45.0,
-		receiptDays: 3
+		hasReceipt: true
 	},
 	{
 		name: 'Rainbow Grocery',
@@ -78,6 +78,6 @@ export const transactions: Transaction[] = [
 		category: 'Food & Drink',
 		date: 'Feb 07',
 		amount: -132.86,
-		receiptDays: 19
+		hasReceipt: true
 	}
 ];

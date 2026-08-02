@@ -69,13 +69,13 @@
 					</div>
 					<div class="font-mono text-xs text-muted">{tx.date}</div>
 					<div>
-						{#if tx.receiptDays > 0}
+						{#if tx.hasReceipt}
 							<span
 								title="Receipt attached"
 								class="inline-flex items-center gap-1 rounded-md border border-accent/32 bg-accent/14 px-1.5 py-0.5 font-mono text-[10.5px] text-accent-hover"
 							>
 								<Paperclip size={11} strokeWidth={2} />
-								{tx.receiptDays}d
+								Receipt
 							</span>
 						{/if}
 					</div>
