@@ -107,7 +107,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		if (tx.amount > 0) {
 			monthlyIncome += tx.amount;
-		} else {
+		} else if (tx.amount < 0) {
 			const spend = Math.abs(tx.amount);
 			monthlyExpenses += spend;
 			const existing = categoryTotals.get(tx.category_id);
