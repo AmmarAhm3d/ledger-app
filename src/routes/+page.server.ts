@@ -216,6 +216,23 @@ export const actions: Actions = {
 			.values({ name, monthly_cap: monthlyCap, user_id: locals.user.id });
 	},
 
+	updateCategory: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const form = await request.formData();
+		const id = parseId(form.get('id'));
+		const name = String(form.get('name') ?? '').trim();
+		const monthlyCap = parseOptionalAmount(form.get('monthly_cap'));
+
+		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
+		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
+		if (!name) return fail(400, { message: 'Category name is required' });
+
+		await db
+			.update(categories)
+			.set({ name, monthly_cap: monthlyCap })
+			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
+	},
+
 	removeCategory: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
