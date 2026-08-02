@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { authClient } from '$lib/auth-client';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import DashboardHeader from '$lib/components/DashboardHeader.svelte';
 	import KPICards from '$lib/components/KPICards.svelte';
@@ -50,6 +52,11 @@
 
 	let accountsTotal = $derived(accounts.reduce((sum, a) => sum + a.balance, 0));
 
+	async function handleSignOut() {
+		await authClient.signOut();
+		await goto('/login');
+	}
+
 	function handleToggleBalance() {
 		if (balanceHidden) {
 			pin = '';
@@ -85,6 +92,7 @@
 		onNav={(key) => (nav = key)}
 		onManageAccounts={() => (accountsOpen = true)}
 		onManageCategories={() => (categoriesOpen = true)}
+		onSignOut={handleSignOut}
 		open={mobileNavOpen}
 		onClose={() => (mobileNavOpen = false)}
 	/>

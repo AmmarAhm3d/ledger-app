@@ -6,6 +6,7 @@
 		Receipt,
 		Settings,
 		CreditCard,
+		LogOut,
 		X
 	} from '@lucide/svelte';
 	import type { NavKey } from '$lib/types';
@@ -17,6 +18,7 @@
 		onNav: (key: NavKey) => void;
 		onManageAccounts: () => void;
 		onManageCategories: () => void;
+		onSignOut: () => void;
 		open?: boolean;
 		onClose?: () => void;
 	}
@@ -28,6 +30,7 @@
 		onNav,
 		onManageAccounts,
 		onManageCategories,
+		onSignOut,
 		open = false,
 		onClose
 	}: Props = $props();
@@ -148,6 +151,19 @@
 			<div class="min-w-0 leading-tight">
 				<div class="text-xs font-semibold text-ink">Manage categories</div>
 				<div class="text-[11px] text-muted">{categoryCount} tracked</div>
+			</div>
+		</button>
+		<button
+			onclick={onSignOut}
+			class="flex items-center gap-2.5 rounded-[10px] border border-border bg-panel-2 px-2.5 py-2.5 text-left transition-colors duration-100 hover:bg-panel-hover"
+		>
+			<div
+				class="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg bg-panel-strong text-dim"
+			>
+				<LogOut size={13} strokeWidth={2} />
+			</div>
+			<div class="min-w-0 leading-tight">
+				<div class="text-xs font-semibold text-ink">Sign out</div>
 			</div>
 		</button>
 	</div>

@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { put } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
@@ -35,10 +35,13 @@ function toAccountType(value: string): AccountType {
 	return value as AccountType;
 }
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ locals }) => {
+	if (!locals.user) throw error(401, 'Unauthorized');
+	const userId = locals.user.id;
+
 	const [accountRows, categoryRows, transactionRows] = await Promise.all([
-		db.select().from(accounts).orderBy(accounts.id),
-		db.select().from(categories).orderBy(categories.id),
+		db.select().from(accounts).where(eq(accounts.user_id, userId)).orderBy(accounts.id),
+		db.select().from(categories).where(eq(categories.user_id, userId)).orderBy(categories.id),
 		db
 			.select({
 				id: transactions.id,
@@ -55,6 +58,7 @@ export const load: PageServerLoad = async () => {
 			.from(transactions)
 			.innerJoin(accounts, eq(transactions.account_id, accounts.id))
 			.innerJoin(categories, eq(transactions.category_id, categories.id))
+			.where(eq(transactions.user_id, userId))
 			.orderBy(desc(transactions.date), desc(transactions.id))
 	]);
 
@@ -75,7 +79,8 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
-	addAccount: async ({ request }) => {
+	addAccount: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const type = String(form.get('type') ?? '');
@@ -86,18 +91,22 @@ export const actions: Actions = {
 			return fail(400, { message: 'Invalid account type' });
 		if (Number.isNaN(balance)) return fail(400, { message: 'Balance must be a number' });
 
-		await db.insert(accounts).values({ name, type, balance });
+		await db.insert(accounts).values({ name, type, balance, user_id: locals.user.id });
 	},
 
-	removeAccount: async ({ request }) => {
+	removeAccount: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 		const id = parseId(form.get('id'));
 		if (Number.isNaN(id)) return fail(400, { message: 'Invalid account id' });
 
-		await db.delete(accounts).where(eq(accounts.id, id));
+		await db
+			.delete(accounts)
+			.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
 	},
 
-	updateAccountBalance: async ({ request }) => {
+	updateAccountBalance: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 		const id = parseId(form.get('id'));
 		const balance = parseAmount(form.get('balance'));
@@ -105,10 +114,14 @@ export const actions: Actions = {
 		if (Number.isNaN(id)) return fail(400, { message: 'Invalid account id' });
 		if (Number.isNaN(balance)) return fail(400, { message: 'Balance must be a number' });
 
-		await db.update(accounts).set({ balance }).where(eq(accounts.id, id));
+		await db
+			.update(accounts)
+			.set({ balance })
+			.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
 	},
 
-	addCategory: async ({ request }) => {
+	addCategory: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const monthlyCap = parseAmount(form.get('monthly_cap'));
@@ -116,18 +129,24 @@ export const actions: Actions = {
 		if (!name) return fail(400, { message: 'Category name is required' });
 		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
 
-		await db.insert(categories).values({ name, monthly_cap: monthlyCap });
+		await db
+			.insert(categories)
+			.values({ name, monthly_cap: monthlyCap, user_id: locals.user.id });
 	},
 
-	removeCategory: async ({ request }) => {
+	removeCategory: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 		const id = parseId(form.get('id'));
 		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
 
-		await db.delete(categories).where(eq(categories.id, id));
+		await db
+			.delete(categories)
+			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
 	},
 
-	addTransaction: async ({ request }) => {
+	addTransaction: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const formData = await request.formData();
 
 		const amount = parseAmount(formData.get('amount'));
@@ -145,6 +164,18 @@ export const actions: Actions = {
 		) {
 			return fail(400, { message: 'Missing required fields' });
 		}
+
+		const [ownedAccount] = await db
+			.select({ id: accounts.id })
+			.from(accounts)
+			.where(and(eq(accounts.id, accountId), eq(accounts.user_id, locals.user.id)));
+		if (!ownedAccount) return fail(400, { message: 'Invalid account' });
+
+		const [ownedCategory] = await db
+			.select({ id: categories.id })
+			.from(categories)
+			.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
+		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
 		let receiptUrl: string | null = null;
 		if (receipt instanceof File && receipt.size > 0) {
@@ -172,7 +203,8 @@ export const actions: Actions = {
 			category_id: categoryId,
 			date,
 			has_receipt: receiptUrl !== null,
-			receipt_url: receiptUrl
+			receipt_url: receiptUrl,
+			user_id: locals.user.id
 		});
 	}
 };
