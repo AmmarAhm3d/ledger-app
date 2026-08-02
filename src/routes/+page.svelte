@@ -14,10 +14,9 @@
 		monthlyExpenses,
 		monthlyBudgetCap,
 		categorySpend,
-		weeklySpend,
-		transactions
+		weeklySpend
 	} from '$lib/data';
-	import type { NavKey } from '$lib/types';
+	import type { NavKey, Transaction } from '$lib/types';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -31,6 +30,17 @@
 
 	let accountsOpen = $state(false);
 	let categoriesOpen = $state(false);
+
+	let transactions = $derived<Transaction[]>(
+		data.transactions.map((tx) => ({
+			name: tx.description ?? 'Transaction',
+			account: tx.account_name,
+			category: tx.category_name,
+			date: tx.date,
+			amount: tx.amount,
+			hasReceipt: tx.has_receipt
+		}))
+	);
 
 	let balanceHidden = $state(true);
 	let pinOpen = $state(false);
@@ -128,6 +138,8 @@
 
 <AddTransactionModal
 	open={addTransactionOpen}
-	retentionDays={30}
+	{accounts}
+	{categories}
 	onClose={() => (addTransactionOpen = false)}
+	errorMessage={form?.message}
 />
