@@ -26,9 +26,33 @@
 		return `${year}-${month}-${day}`;
 	}
 
+	const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+	const ALLOWED_RECEIPT_TYPES = ['image/png', 'image/jpeg', 'application/pdf'];
+
 	function handleFileChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
-		receiptFileName = input.files?.[0]?.name ?? '';
+		const file = input.files?.[0];
+
+		if (!file) {
+			receiptFileName = '';
+			return;
+		}
+
+		if (file.size >= MAX_RECEIPT_BYTES) {
+			input.value = '';
+			receiptFileName = '';
+			alert('Receipt must be smaller than 5 MB');
+			return;
+		}
+
+		if (!ALLOWED_RECEIPT_TYPES.includes(file.type)) {
+			input.value = '';
+			receiptFileName = '';
+			alert('Receipt must be a PNG, JPEG, or PDF file');
+			return;
+		}
+
+		receiptFileName = file.name;
 	}
 
 	function handleCancel() {
@@ -164,7 +188,7 @@
 					id="tx-receipt"
 					name="receipt"
 					type="file"
-					accept="image/*,.pdf"
+					accept="image/png, image/jpeg, application/pdf"
 					class="sr-only"
 					onchange={handleFileChange}
 				/>
