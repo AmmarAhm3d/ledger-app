@@ -25,7 +25,7 @@
 	<div
 		onclick={onClose}
 		role="presentation"
-		class="fixed inset-0 z-45 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+		class="fixed inset-0 z-45 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
 	>
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div
@@ -34,7 +34,7 @@
 			aria-modal="true"
 			aria-label="Enter your PIN"
 			tabindex="-1"
-			class="flex w-74 flex-col items-center gap-3.5 rounded-2xl border border-border-strong bg-panel-2 p-5.5 shadow-2xl"
+			class="flex w-full max-w-74 flex-col items-center gap-3.5 rounded-2xl border border-border-strong bg-panel-2 p-5.5 shadow-2xl"
 		>
 			<div
 				class="flex h-8.5 w-8.5 items-center justify-center rounded-[10px] bg-panel-strong text-ink"

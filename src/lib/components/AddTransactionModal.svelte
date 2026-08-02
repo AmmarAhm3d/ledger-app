@@ -29,14 +29,14 @@
 	<div
 		onclick={onClose}
 		role="presentation"
-		class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+		class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
 	>
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			onclick={(e) => e.stopPropagation()}
 			role="presentation"
-			class="flex w-108 flex-col gap-3.75 rounded-2xl border border-border-strong bg-panel-2 p-5 shadow-2xl"
+			class="flex max-h-[90vh] w-full max-w-108 flex-col gap-3.75 overflow-y-auto rounded-2xl border border-border-strong bg-panel-2 p-5 shadow-2xl"
 		>
 			<div>
 				<div class="text-[15.5px] font-semibold tracking-tight">Add transaction</div>

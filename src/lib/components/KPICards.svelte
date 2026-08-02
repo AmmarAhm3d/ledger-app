@@ -16,7 +16,7 @@
 	let expenseShare = $derived(Math.round((monthlyExpenses / monthlyIncome) * 1000) / 10);
 </script>
 
-<section class="grid grid-cols-3 gap-4">
+<section class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
 	<div
 		class="rounded-[13px] border border-border bg-panel p-4.5 transition-colors duration-150 hover:border-border-hover"
 	>

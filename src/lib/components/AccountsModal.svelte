@@ -43,14 +43,14 @@
 	<div
 		onclick={onClose}
 		role="presentation"
-		class="fixed inset-0 z-45 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
+		class="fixed inset-0 z-45 flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]"
 	>
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			onclick={(e) => e.stopPropagation()}
 			role="presentation"
-			class="flex max-h-[82vh] w-110 flex-col gap-3.5 overflow-y-auto rounded-2xl border border-border-strong bg-panel-2 p-5 shadow-2xl"
+			class="flex max-h-[82vh] w-full max-w-110 flex-col gap-3.5 overflow-y-auto rounded-2xl border border-border-strong bg-panel-2 p-5 shadow-2xl"
 		>
 			<div>
 				<div class="text-[15px] font-semibold tracking-tight">Accounts</div>
@@ -96,7 +96,7 @@
 
 			<div class="flex flex-col gap-2.5 border-t border-border pt-3.5">
 				<div class="text-[12.5px] font-semibold">Add account</div>
-				<div class="grid grid-cols-[1.3fr_1fr] gap-2.5">
+				<div class="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.3fr_1fr]">
 					<input
 						bind:value={newName}
 						placeholder="e.g. Meezan Bank"
