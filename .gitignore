@@ -26,3 +26,4 @@ vite.config.ts.timestamp-*
 
 # Design reference dropped in by contributors, not app source
 /prototype
+.env*
