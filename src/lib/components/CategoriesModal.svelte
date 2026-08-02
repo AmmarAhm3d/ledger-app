@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { Plus, Trash2 } from '@lucide/svelte';
-	import { formatPKR } from '$lib/format';
 	import type { Category } from '$lib/types';
 
 	interface Props {
@@ -52,13 +51,33 @@
 					<div
 						class="flex items-center gap-2.5 rounded-[10px] border border-border-strong bg-panel px-2.5 py-2.25"
 					>
-						<div class="min-w-0 flex-1">
-							<div class="truncate text-[12.5px] font-semibold">{category.name}</div>
-							<div class="text-[11px] text-muted">Monthly cap</div>
-						</div>
-						<span class="w-27.5 text-right font-mono text-[12.5px] text-ink"
-							>{formatPKR(category.monthly_cap)}</span
+						<form
+							method="POST"
+							action="?/updateCategory"
+							use:enhance={() => {
+								return async ({ update }) => {
+									await update({ reset: false });
+								};
+							}}
+							class="flex min-w-0 flex-1 items-center gap-2.5"
 						>
+							<input type="hidden" name="id" value={category.id} />
+							<div class="min-w-0 flex-1">
+								<input
+									name="name"
+									value={category.name}
+									onchange={(e) => e.currentTarget.form?.requestSubmit()}
+									class="w-full truncate rounded-lg border border-transparent bg-transparent px-0 py-0 text-[12.5px] font-semibold text-ink outline-none focus:border-accent focus:bg-panel-2 focus:px-2 focus:py-1.5"
+								/>
+								<div class="text-[11px] text-muted">Monthly cap</div>
+							</div>
+							<input
+								name="monthly_cap"
+								value={String(category.monthly_cap)}
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								class="w-27.5 rounded-lg border border-border-strong bg-panel-2 px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
+							/>
+						</form>
 						<form method="POST" action="?/removeCategory" use:enhance>
 							<input type="hidden" name="id" value={category.id} />
 							<button
