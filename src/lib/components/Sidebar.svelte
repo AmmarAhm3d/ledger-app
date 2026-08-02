@@ -5,7 +5,8 @@
 		Tag,
 		Receipt,
 		Settings,
-		CreditCard
+		CreditCard,
+		X
 	} from '@lucide/svelte';
 	import type { NavKey } from '$lib/types';
 
@@ -14,9 +15,11 @@
 		accountCount: number;
 		onNav: (key: NavKey) => void;
 		onManageAccounts: () => void;
+		open?: boolean;
+		onClose?: () => void;
 	}
 
-	let { nav, accountCount, onNav, onManageAccounts }: Props = $props();
+	let { nav, accountCount, onNav, onManageAccounts, open = false, onClose }: Props = $props();
 
 	const items: { key: NavKey; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
 		{ key: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -25,10 +28,32 @@
 		{ key: 'receipts', label: 'Receipts', icon: Receipt, badge: 12 },
 		{ key: 'settings', label: 'Settings', icon: Settings }
 	];
+
+	function handleNav(key: NavKey) {
+		onNav(key);
+		onClose?.();
+	}
+
+	function handleManageAccounts() {
+		onManageAccounts();
+		onClose?.();
+	}
 </script>
 
+{#if open}
+	<!-- svelte-ignore a11y_click_events_have_key_events -->
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div
+		onclick={onClose}
+		role="presentation"
+		class="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] lg:hidden"
+	></div>
+{/if}
+
 <aside
-	class="sticky top-0 flex h-screen w-[244px] flex-none flex-col gap-6.5 border-r border-border bg-panel px-3.5 py-5"
+	class="fixed inset-y-0 left-0 z-50 flex h-screen w-[244px] flex-none flex-col gap-6.5 border-r border-border bg-panel px-3.5 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:translate-x-0 {open
+		? 'translate-x-0'
+		: '-translate-x-full'}"
 >
 	<div class="flex items-center gap-2.5 px-2">
 		<div class="flex h-7 w-7 items-center justify-center rounded-lg bg-ink">
@@ -49,12 +74,19 @@
 		<div class="ml-auto rounded-md border border-border-strong px-1.5 py-0.5 text-[10px] font-medium text-muted">
 			v1.4
 		</div>
+		<button
+			onclick={onClose}
+			aria-label="Close menu"
+			class="flex h-6.5 w-6.5 items-center justify-center rounded-lg text-muted hover:bg-panel-hover hover:text-ink lg:hidden"
+		>
+			<X size={14} strokeWidth={1.9} />
+		</button>
 	</div>
 
 	<nav class="flex flex-col gap-0.5">
 		{#each items as item (item.key)}
 			<button
-				onclick={() => onNav(item.key)}
+				onclick={() => handleNav(item.key)}
 				class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] font-medium transition-colors duration-100 hover:bg-panel-hover"
 				class:bg-panel-strong={nav === item.key}
 				class:text-ink={nav === item.key}
@@ -75,7 +107,7 @@
 
 	<div class="mt-auto flex flex-col gap-3">
 		<button
-			onclick={onManageAccounts}
+			onclick={handleManageAccounts}
 			class="flex items-center gap-2.5 rounded-[10px] border border-border bg-panel-2 px-2.5 py-2.5 text-left transition-colors duration-100 hover:bg-panel-hover"
 		>
 			<div

@@ -21,6 +21,7 @@
 
 	let nav = $state<NavKey>('overview');
 	let range = $state<30 | 90>(30);
+	let mobileNavOpen = $state(false);
 
 	let accounts = $state<Account[]>(initialAccounts);
 	let accountsOpen = $state(false);
@@ -77,6 +78,8 @@
 		accountCount={accounts.length}
 		onNav={(key) => (nav = key)}
 		onManageAccounts={() => (accountsOpen = true)}
+		open={mobileNavOpen}
+		onClose={() => (mobileNavOpen = false)}
 	/>
 
 	<main class="flex min-w-0 flex-1 flex-col">
@@ -84,9 +87,10 @@
 			title="Overview"
 			subtitle="February 2026 · synced 4 minutes ago"
 			onAddTransaction={() => (addTransactionOpen = true)}
+			onToggleNav={() => (mobileNavOpen = true)}
 		/>
 
-		<div class="flex flex-col gap-5 px-8 pt-6.5 pb-10">
+		<div class="flex flex-col gap-4 px-4 pt-5 pb-8 sm:gap-5 sm:px-6 sm:pt-6.5 sm:pb-10 lg:px-8">
 			<KPICards
 				{accountsTotal}
 				{balanceHidden}
@@ -95,7 +99,7 @@
 				onToggleBalance={handleToggleBalance}
 			/>
 
-			<section class="grid grid-cols-[minmax(0,1.32fr)_minmax(0,1fr)] items-start gap-4">
+			<section class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.32fr)_minmax(0,1fr)]">
 				<CategoryChart
 					categories={categorySpend}
 					{range}
