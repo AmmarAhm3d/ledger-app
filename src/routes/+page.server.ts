@@ -26,6 +26,11 @@ function parseAmount(raw: FormDataEntryValue | null): number {
 	return cleaned === '' ? NaN : Number(cleaned);
 }
 
+function parseOptionalAmount(raw: FormDataEntryValue | null, fallback = 0): number {
+	if (String(raw ?? '').trim() === '') return fallback;
+	return parseAmount(raw);
+}
+
 function parseId(raw: FormDataEntryValue | null): number {
 	const id = Number(raw);
 	return Number.isInteger(id) && id > 0 ? id : NaN;
@@ -161,7 +166,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const name = String(form.get('name') ?? '').trim();
 		const type = String(form.get('type') ?? '');
-		const balance = parseAmount(form.get('balance'));
+		const balance = parseOptionalAmount(form.get('balance'));
 
 		if (!name) return fail(400, { message: 'Account name is required' });
 		if (!ACCOUNT_TYPES.includes(type as AccountType))
@@ -201,7 +206,7 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 		const name = String(form.get('name') ?? '').trim();
-		const monthlyCap = parseAmount(form.get('monthly_cap'));
+		const monthlyCap = parseOptionalAmount(form.get('monthly_cap'));
 
 		if (!name) return fail(400, { message: 'Category name is required' });
 		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
