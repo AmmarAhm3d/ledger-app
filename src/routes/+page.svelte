@@ -20,6 +20,8 @@
 	let categories = $derived(data.categories);
 	let monthlyIncome = $derived(data.monthlyIncome);
 	let monthlyExpenses = $derived(data.monthlyExpenses);
+	let incomeChangePct = $derived(data.incomeChangePct);
+	let expenseChangePct = $derived(data.expenseChangePct);
 	let monthlyBudgetCap = $derived(data.monthlyBudgetCap);
 	let categorySpend = $derived(data.categorySpend);
 	let weeklySpend = $derived(data.weeklySpend);
@@ -109,6 +111,8 @@
 				{balanceHidden}
 				{monthlyIncome}
 				{monthlyExpenses}
+				{incomeChangePct}
+				{expenseChangePct}
 				onToggleBalance={handleToggleBalance}
 			/>
 
