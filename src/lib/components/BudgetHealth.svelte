@@ -18,10 +18,18 @@
 		}));
 	});
 
-	// Illustrative figures from the prototype (not strictly derivable from the weekly bars above).
-	const remaining = 1021;
-	const avgDailyBurn = 113.5;
-	const projectedClose = 3972;
+	let remaining = $derived(monthlyBudgetCap - monthlyExpenses);
+
+	let avgDailyBurn = $derived.by(() => {
+		const dayOfMonth = new Date().getDate();
+		return dayOfMonth > 0 ? monthlyExpenses / dayOfMonth : 0;
+	});
+
+	let projectedClose = $derived.by(() => {
+		const now = new Date();
+		const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+		return avgDailyBurn * daysInMonth;
+	});
 </script>
 
 <div class="rounded-[13px] border border-border bg-panel px-4.5 pt-4 pb-4.5">
