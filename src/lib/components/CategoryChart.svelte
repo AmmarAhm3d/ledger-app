@@ -20,8 +20,8 @@
 			name: c.name,
 			color: c.color,
 			amount: formatPKR(c.baseAmount * mult),
-			share: Math.round((c.baseAmount / totalBase) * 100) + '%',
-			width: Math.round((c.baseAmount / maxBase) * 100) + '%'
+			share: (totalBase === 0 ? 0 : Math.round((c.baseAmount / totalBase) * 100)) + '%',
+			width: (maxBase === 0 ? 0 : Math.round((c.baseAmount / maxBase) * 100)) + '%'
 		}));
 	});
 
