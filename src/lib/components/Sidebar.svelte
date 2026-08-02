@@ -13,13 +13,24 @@
 	interface Props {
 		nav: NavKey;
 		accountCount: number;
+		categoryCount: number;
 		onNav: (key: NavKey) => void;
 		onManageAccounts: () => void;
+		onManageCategories: () => void;
 		open?: boolean;
 		onClose?: () => void;
 	}
 
-	let { nav, accountCount, onNav, onManageAccounts, open = false, onClose }: Props = $props();
+	let {
+		nav,
+		accountCount,
+		categoryCount,
+		onNav,
+		onManageAccounts,
+		onManageCategories,
+		open = false,
+		onClose
+	}: Props = $props();
 
 	const items: { key: NavKey; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
 		{ key: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -36,6 +47,11 @@
 
 	function handleManageAccounts() {
 		onManageAccounts();
+		onClose?.();
+	}
+
+	function handleManageCategories() {
+		onManageCategories();
 		onClose?.();
 	}
 </script>
@@ -118,6 +134,20 @@
 			<div class="min-w-0 leading-tight">
 				<div class="text-xs font-semibold text-ink">Manage accounts</div>
 				<div class="text-[11px] text-muted">{accountCount} linked · entered manually</div>
+			</div>
+		</button>
+		<button
+			onclick={handleManageCategories}
+			class="flex items-center gap-2.5 rounded-[10px] border border-border bg-panel-2 px-2.5 py-2.5 text-left transition-colors duration-100 hover:bg-panel-hover"
+		>
+			<div
+				class="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg bg-panel-strong text-dim"
+			>
+				<Tag size={13} strokeWidth={2} />
+			</div>
+			<div class="min-w-0 leading-tight">
+				<div class="text-xs font-semibold text-ink">Manage categories</div>
+				<div class="text-[11px] text-muted">{categoryCount} tracked</div>
 			</div>
 		</button>
 	</div>

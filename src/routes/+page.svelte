@@ -7,9 +7,9 @@
 	import TransactionTable from '$lib/components/TransactionTable.svelte';
 	import PinModal from '$lib/components/PinModal.svelte';
 	import AccountsModal from '$lib/components/AccountsModal.svelte';
+	import CategoriesModal from '$lib/components/CategoriesModal.svelte';
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
 	import {
-		initialAccounts,
 		monthlyIncome,
 		monthlyExpenses,
 		monthlyBudgetCap,
@@ -17,14 +17,20 @@
 		weeklySpend,
 		transactions
 	} from '$lib/data';
-	import type { Account, AccountType, NavKey } from '$lib/types';
+	import type { NavKey } from '$lib/types';
+	import type { ActionData, PageData } from './$types';
+
+	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	let accounts = $derived(data.accounts);
+	let categories = $derived(data.categories);
 
 	let nav = $state<NavKey>('overview');
 	let range = $state<30 | 90>(30);
 	let mobileNavOpen = $state(false);
 
-	let accounts = $state<Account[]>(initialAccounts);
 	let accountsOpen = $state(false);
+	let categoriesOpen = $state(false);
 
 	let balanceHidden = $state(true);
 	let pinOpen = $state(false);
@@ -59,25 +65,16 @@
 		}
 	}
 
-	function handleUpdateAccountAmount(id: number, balance: number) {
-		accounts = accounts.map((a) => (a.id === id ? { ...a, balance } : a));
-	}
-
-	function handleRemoveAccount(id: number) {
-		accounts = accounts.filter((a) => a.id !== id);
-	}
-
-	function handleAddAccount(name: string, type: AccountType, balance: number) {
-		accounts = [...accounts, { id: Date.now(), name, type, balance }];
-	}
 </script>
 
 <div class="flex min-h-screen text-ink">
 	<Sidebar
 		{nav}
 		accountCount={accounts.length}
+		categoryCount={categories.length}
 		onNav={(key) => (nav = key)}
 		onManageAccounts={() => (accountsOpen = true)}
+		onManageCategories={() => (categoriesOpen = true)}
 		open={mobileNavOpen}
 		onClose={() => (mobileNavOpen = false)}
 	/>
@@ -117,9 +114,14 @@
 	open={accountsOpen}
 	{accounts}
 	onClose={() => (accountsOpen = false)}
-	onUpdateAmount={handleUpdateAccountAmount}
-	onRemove={handleRemoveAccount}
-	onAdd={handleAddAccount}
+	errorMessage={form?.message}
+/>
+
+<CategoriesModal
+	open={categoriesOpen}
+	{categories}
+	onClose={() => (categoriesOpen = false)}
+	errorMessage={form?.message}
 />
 
 <PinModal open={pinOpen} {pin} onPressKey={handlePressKey} onClose={() => (pinOpen = false)} />

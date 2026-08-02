@@ -9,6 +9,12 @@ export interface Account {
 	balance: number;
 }
 
+export interface Category {
+	id: number;
+	name: string;
+	monthly_cap: number;
+}
+
 export interface CategorySpend {
 	name: string;
 	baseAmount: number;
