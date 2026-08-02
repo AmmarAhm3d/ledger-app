@@ -4,10 +4,13 @@ import { put } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
-import type { AccountType } from '$lib/types';
+import type { AccountType, CategorySpend } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 const ACCOUNT_TYPES: readonly AccountType[] = ['Bank', 'Microfinance / Wallet', 'Cash'];
+
+const CATEGORY_COLORS = ['#F4F4F5', '#818CF8', '#A5B4FC', '#6366F1', '#4338CA', '#3F3F46'];
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 const ALLOWED_RECEIPT_TYPES: Record<string, string> = {
@@ -62,6 +65,49 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.orderBy(desc(transactions.date), desc(transactions.id))
 	]);
 
+	const now = new Date();
+	const currentMonthPrefix = now.toISOString().slice(0, 7);
+	const today = new Date(now.toISOString().slice(0, 10));
+
+	let monthlyIncome = 0;
+	let monthlyExpenses = 0;
+	const categoryTotals = new Map<number, { name: string; total: number }>();
+	const weeklySpend = [0, 0, 0, 0];
+
+	for (const tx of transactionRows) {
+		if (tx.amount < 0) {
+			const daysAgo = Math.floor((today.getTime() - new Date(tx.date).getTime()) / DAY_MS);
+			if (daysAgo >= 0 && daysAgo < 28) {
+				weeklySpend[3 - Math.floor(daysAgo / 7)] += Math.abs(tx.amount);
+			}
+		}
+
+		if (!tx.date.startsWith(currentMonthPrefix)) continue;
+
+		if (tx.amount > 0) {
+			monthlyIncome += tx.amount;
+		} else {
+			const spend = Math.abs(tx.amount);
+			monthlyExpenses += spend;
+			const existing = categoryTotals.get(tx.category_id);
+			if (existing) {
+				existing.total += spend;
+			} else {
+				categoryTotals.set(tx.category_id, { name: tx.category_name, total: spend });
+			}
+		}
+	}
+
+	const categorySpend: CategorySpend[] = [...categoryTotals.values()]
+		.sort((a, b) => b.total - a.total)
+		.map((c, i) => ({
+			name: c.name,
+			baseAmount: c.total,
+			color: CATEGORY_COLORS[i % CATEGORY_COLORS.length]
+		}));
+
+	const monthlyBudgetCap = categoryRows.reduce((sum, c) => sum + c.monthly_cap, 0);
+
 	return {
 		accounts: accountRows.map((a) => ({
 			id: a.id,
@@ -74,7 +120,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 			name: c.name,
 			monthly_cap: c.monthly_cap
 		})),
-		transactions: transactionRows
+		transactions: transactionRows,
+		monthlyIncome,
+		monthlyExpenses,
+		categorySpend,
+		monthlyBudgetCap,
+		weeklySpend
 	};
 };
 

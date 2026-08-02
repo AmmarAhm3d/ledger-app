@@ -10,11 +10,11 @@
 	let { weeklySpend, monthlyExpenses, monthlyBudgetCap }: Props = $props();
 
 	let bars = $derived.by(() => {
-		const max = Math.max(...weeklySpend);
+		const max = Math.max(...weeklySpend, 0);
 		return weeklySpend.map((v, i) => ({
-			label: `Day block ${i + 1} · ${formatPKR(v)}`,
-			height: Math.round((v / max) * 100) + '%',
-			color: v > 240 ? 'var(--color-amber)' : i > 8 ? 'var(--color-faint)' : 'var(--color-accent)'
+			label: `Week ${i + 1} · ${formatPKR(v)}`,
+			height: (max > 0 ? Math.round((v / max) * 100) : 0) + '%',
+			color: v > 240 ? 'var(--color-amber)' : 'var(--color-accent)'
 		}));
 	});
 
