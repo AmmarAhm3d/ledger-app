@@ -138,8 +138,8 @@
 
 <AddTransactionModal
 	open={addTransactionOpen}
-	retentionDays={30}
 	{accounts}
 	{categories}
 	onClose={() => (addTransactionOpen = false)}
+	errorMessage={form?.message}
 />

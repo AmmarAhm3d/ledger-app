@@ -5,13 +5,13 @@
 
 	interface Props {
 		open: boolean;
-		retentionDays: number;
 		accounts: Account[];
 		categories: Category[];
 		onClose: () => void;
+		errorMessage?: string;
 	}
 
-	let { open, retentionDays, accounts, categories, onClose }: Props = $props();
+	let { open, accounts, categories, onClose, errorMessage }: Props = $props();
 
 	let formEl = $state<HTMLFormElement | null>(null);
 	let fileInputEl = $state<HTMLInputElement | null>(null);
@@ -19,7 +19,11 @@
 	let submitting = $state(false);
 
 	function today() {
-		return new Date().toISOString().slice(0, 10);
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, '0');
+		const day = String(now.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
 	}
 
 	function handleFileChange(e: Event) {
@@ -57,6 +61,11 @@
 					Logged to your personal ledger with an audit entry.
 				</div>
 			</div>
+			{#if errorMessage}
+				<div class="rounded-lg border border-red/40 bg-red/10 px-3 py-2 text-xs text-red">
+					{errorMessage}
+				</div>
+			{/if}
 			<form
 				bind:this={formEl}
 				method="POST"
@@ -147,9 +156,7 @@
 						<div class="truncate text-[12.5px] font-semibold">
 							{receiptFileName || 'Attach receipt image'}
 						</div>
-						<div class="mt-0.5 text-[11.5px] text-muted">
-							Auto-deleted after {retentionDays} days
-						</div>
+						<div class="mt-0.5 text-[11.5px] text-muted">Stored privately with this transaction</div>
 					</div>
 				</label>
 				<input

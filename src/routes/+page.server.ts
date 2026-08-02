@@ -1,13 +1,22 @@
 import { error, fail } from '@sveltejs/kit';
 import { desc, eq } from 'drizzle-orm';
 import { put } from '@vercel/blob';
-import { BLOB_READ_WRITE_TOKEN } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
 import type { AccountType } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 const ACCOUNT_TYPES: readonly AccountType[] = ['Bank', 'Microfinance / Wallet', 'Cash'];
+
+const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+const ALLOWED_RECEIPT_TYPES: Record<string, string> = {
+	'image/jpeg': 'jpg',
+	'image/png': 'png',
+	'image/webp': 'webp',
+	'image/heic': 'heic',
+	'application/pdf': 'pdf'
+};
 
 function parseAmount(raw: FormDataEntryValue | null): number {
 	const cleaned = String(raw ?? '').replace(/[^0-9.-]/g, '');
@@ -121,23 +130,37 @@ export const actions: Actions = {
 	addTransaction: async ({ request }) => {
 		const formData = await request.formData();
 
-		const amount = Number(formData.get('amount'));
+		const amount = parseAmount(formData.get('amount'));
 		const description = formData.get('description')?.toString().trim() || null;
-		const accountId = Number(formData.get('account_id'));
-		const categoryId = Number(formData.get('category_id'));
+		const accountId = parseId(formData.get('account_id'));
+		const categoryId = parseId(formData.get('category_id'));
 		const date = formData.get('date')?.toString();
 		const receipt = formData.get('receipt');
 
-		if (!Number.isFinite(amount) || !accountId || !categoryId || !date) {
+		if (
+			!Number.isFinite(amount) ||
+			Number.isNaN(accountId) ||
+			Number.isNaN(categoryId) ||
+			!date
+		) {
 			return fail(400, { message: 'Missing required fields' });
 		}
 
 		let receiptUrl: string | null = null;
 		if (receipt instanceof File && receipt.size > 0) {
-			const blob = await put(`receipts/${Date.now()}-${receipt.name}`, receipt, {
+			const extension = ALLOWED_RECEIPT_TYPES[receipt.type];
+			if (!extension) {
+				return fail(400, { message: 'Receipt must be a JPG, PNG, WEBP, HEIC, or PDF file' });
+			}
+			if (receipt.size > MAX_RECEIPT_BYTES) {
+				return fail(400, { message: 'Receipt must be smaller than 10 MB' });
+			}
+
+			const blob = await put(`receipts/${Date.now()}.${extension}`, receipt, {
 				access: 'private',
 				addRandomSuffix: true,
-				token: BLOB_READ_WRITE_TOKEN
+				oidcToken: env.VERCEL_OIDC_TOKEN,
+				storeId: env.BLOB_STORE_ID
 			});
 			receiptUrl = blob.url;
 		}
