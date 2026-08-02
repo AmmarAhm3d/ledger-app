@@ -8,6 +8,7 @@ const timestamps = {
 	updated_at: text('updated_at')
 		.notNull()
 		.default(sql`(current_timestamp)`)
+		.$onUpdate(() => sql`(current_timestamp)`)
 };
 
 export const accounts = sqliteTable('accounts', {
