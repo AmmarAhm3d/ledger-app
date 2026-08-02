@@ -32,9 +32,13 @@ vercel link              # one-time, links to ammars-projects-3b535e02/ledger-ap
 vercel env pull .env.local
 ```
 
-Required: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (scoped to Development/Preview/Production on the dashboard). Also present: `BLOB_STORE_ID`, `BLOB_WEBHOOK_PUBLIC_KEY`, `VERCEL_OIDC_TOKEN` for Vercel Blob (receipt storage — not yet wired into the app). Both `drizzle.config.ts` and `src/lib/server/db/index.ts` throw immediately if the Turso vars are missing — check the error message rather than digging into a libsql connection failure.
+Required: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (scoped to Development/Preview/Production on the dashboard). Also present: `BLOB_STORE_ID`, `BLOB_WEBHOOK_PUBLIC_KEY` for Vercel Blob (receipt uploads, wired in `+page.server.ts`'s `addTransaction` action). Both `drizzle.config.ts` and `src/lib/server/db/index.ts` throw immediately if the Turso vars are missing — check the error message rather than digging into a libsql connection failure.
 
-Vercel Blob auth note: the SDK does not auto-read env vars in Vite/SvelteKit (only in Next.js) — `oidcToken`/`storeId` must be passed explicitly to `put`/`get`/`list`/`del` calls, sourced from `$env/static/private`.
+**Vercel Blob auth — use `$env/dynamic/private`, never `$env/static/private`, for anything Blob-related.** This project has no `BLOB_READ_WRITE_TOKEN` (confirm with `vercel env ls`); auth is OIDC-based via `BLOB_STORE_ID` + the platform-injected `VERCEL_OIDC_TOKEN`, passed explicitly as `oidcToken`/`storeId` to `put`/`get`/`list`/`del` (the SDK doesn't auto-read env vars outside Next.js).
+
+We hit this the hard way: an earlier version statically imported `BLOB_READ_WRITE_TOKEN` from `$env/static/private`. `npm run build` passed locally — because a stale `.env.local` from a past `vercel env pull` still had that var, even though it's no longer configured on the actual Vercel project. The Vercel build environment only injects what's genuinely set for that environment, so the same import failed there with `[MISSING_EXPORT] "BLOB_READ_WRITE_TOKEN" is not exported by "\0virtual:env/static/private"` — a build failure that only shows up in the Vercel preview/production build log, never locally. `VERCEL_OIDC_TOKEN` compounds this: it's injected at runtime, rotates, and never appears in `vercel env ls` output at all, so it can *never* be a valid `$env/static/private` import regardless of what's in `.env.local`.
+
+**Before adding a new `$env/static/private` import, cross-check the var against `vercel env ls`.** If it's not listed there, or it's a platform-injected var like `VERCEL_OIDC_TOKEN`, use `$env/dynamic/private` (`import { env } from '$env/dynamic/private'`) instead — and don't trust a local `npm run build` success as proof the Vercel build will also pass when env vars are involved.
 
 ## Architecture
 
