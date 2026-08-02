@@ -60,6 +60,9 @@
 		</div>
 	</div>
 	<div class="flex flex-col gap-3.5 px-4.5 pt-1 pb-4.5">
+		{#if rows.length === 0}
+			<p class="py-2 text-xs text-muted">No spending recorded yet.</p>
+		{/if}
 		{#each rows as row (row.name)}
 			<div class="flex flex-col gap-1.5">
 				<div class="flex items-baseline gap-2">

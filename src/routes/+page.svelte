@@ -11,13 +11,6 @@
 	import AccountsModal from '$lib/components/AccountsModal.svelte';
 	import CategoriesModal from '$lib/components/CategoriesModal.svelte';
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
-	import {
-		monthlyIncome,
-		monthlyExpenses,
-		monthlyBudgetCap,
-		categorySpend,
-		weeklySpend
-	} from '$lib/data';
 	import type { NavKey, Transaction } from '$lib/types';
 	import type { ActionData, PageData } from './$types';
 
@@ -25,6 +18,11 @@
 
 	let accounts = $derived(data.accounts);
 	let categories = $derived(data.categories);
+	let monthlyIncome = $derived(data.monthlyIncome);
+	let monthlyExpenses = $derived(data.monthlyExpenses);
+	let monthlyBudgetCap = $derived(data.monthlyBudgetCap);
+	let categorySpend = $derived(data.categorySpend);
+	let weeklySpend = $derived(data.weeklySpend);
 
 	let nav = $state<NavKey>('overview');
 	let range = $state<30 | 90>(30);

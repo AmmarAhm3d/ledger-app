@@ -13,7 +13,9 @@
 	let { accountsTotal, balanceHidden, monthlyIncome, monthlyExpenses, onToggleBalance }: Props =
 		$props();
 
-	let expenseShare = $derived(Math.round((monthlyExpenses / monthlyIncome) * 1000) / 10);
+	let expenseShare = $derived(
+		monthlyIncome > 0 ? Math.round((monthlyExpenses / monthlyIncome) * 1000) / 10 : 0
+	);
 </script>
 
 <section class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
