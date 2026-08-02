@@ -7,11 +7,20 @@
 		balanceHidden: boolean;
 		monthlyIncome: number;
 		monthlyExpenses: number;
+		incomeChangePct: number;
+		expenseChangePct: number;
 		onToggleBalance: () => void;
 	}
 
-	let { accountsTotal, balanceHidden, monthlyIncome, monthlyExpenses, onToggleBalance }: Props =
-		$props();
+	let {
+		accountsTotal,
+		balanceHidden,
+		monthlyIncome,
+		monthlyExpenses,
+		incomeChangePct,
+		expenseChangePct,
+		onToggleBalance
+	}: Props = $props();
 
 	let expenseShare = $derived(
 		monthlyIncome > 0 ? Math.round((monthlyExpenses / monthlyIncome) * 1000) / 10 : 0
@@ -54,14 +63,6 @@
 				>
 					Enter PIN to reveal
 				</button>
-			{:else}
-				<span
-					class="inline-flex items-center gap-1 rounded-md border border-green/28 bg-green/12 px-1.5 py-0.5 text-[11.5px] font-semibold text-green"
-				>
-					<TrendingUp size={11} strokeWidth={2.4} />
-					4.2%
-				</span>
-				vs. last month
 			{/if}
 		</div>
 	</div>
@@ -77,13 +78,22 @@
 			{formatPKR(monthlyIncome)}
 		</div>
 		<div class="mt-2 flex items-center gap-1.5 text-xs text-muted">
-			<span
-				class="inline-flex items-center gap-1 rounded-md border border-green/28 bg-green/12 px-1.5 py-0.5 text-[11.5px] font-semibold text-green"
-			>
-				<TrendingUp size={11} strokeWidth={2.4} />
-				1.1%
-			</span>
-			2 deposits pending
+			{#if incomeChangePct >= 0}
+				<span
+					class="inline-flex items-center gap-1 rounded-md border border-green/28 bg-green/12 px-1.5 py-0.5 text-[11.5px] font-semibold text-green"
+				>
+					<TrendingUp size={11} strokeWidth={2.4} />
+					{incomeChangePct}%
+				</span>
+			{:else}
+				<span
+					class="inline-flex items-center gap-1 rounded-md border border-red/28 bg-red/12 px-1.5 py-0.5 text-[11.5px] font-semibold text-red"
+				>
+					<TrendingDown size={11} strokeWidth={2.4} />
+					{Math.abs(incomeChangePct)}%
+				</span>
+			{/if}
+			vs. last month
 		</div>
 	</div>
 
@@ -98,12 +108,21 @@
 			{formatPKR(monthlyExpenses)}
 		</div>
 		<div class="mt-2 flex items-center gap-1.5 text-xs text-muted">
-			<span
-				class="inline-flex items-center gap-1 rounded-md border border-red/28 bg-red/12 px-1.5 py-0.5 text-[11.5px] font-semibold text-red"
-			>
-				<TrendingDown size={11} strokeWidth={2.4} />
-				7.8%
-			</span>
+			{#if expenseChangePct > 0}
+				<span
+					class="inline-flex items-center gap-1 rounded-md border border-red/28 bg-red/12 px-1.5 py-0.5 text-[11.5px] font-semibold text-red"
+				>
+					<TrendingUp size={11} strokeWidth={2.4} />
+					{expenseChangePct}%
+				</span>
+			{:else}
+				<span
+					class="inline-flex items-center gap-1 rounded-md border border-green/28 bg-green/12 px-1.5 py-0.5 text-[11.5px] font-semibold text-green"
+				>
+					<TrendingDown size={11} strokeWidth={2.4} />
+					{Math.abs(expenseChangePct)}%
+				</span>
+			{/if}
 			{expenseShare}% of income
 		</div>
 	</div>

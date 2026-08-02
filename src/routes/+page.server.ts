@@ -69,8 +69,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const currentMonthPrefix = now.toISOString().slice(0, 7);
 	const today = new Date(now.toISOString().slice(0, 10));
 
+	const [currentYear, currentMonth] = currentMonthPrefix.split('-').map(Number);
+	const previousMonthPrefix =
+		currentMonth === 1
+			? `${currentYear - 1}-12`
+			: `${currentYear}-${String(currentMonth - 1).padStart(2, '0')}`;
+
 	let monthlyIncome = 0;
 	let monthlyExpenses = 0;
+	let previousMonthIncome = 0;
+	let previousMonthExpenses = 0;
 	const categoryTotals = new Map<number, { name: string; total: number }>();
 	const weeklySpend = [0, 0, 0, 0];
 
@@ -79,6 +87,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 			const daysAgo = Math.floor((today.getTime() - new Date(tx.date).getTime()) / DAY_MS);
 			if (daysAgo >= 0 && daysAgo < 28) {
 				weeklySpend[3 - Math.floor(daysAgo / 7)] += Math.abs(tx.amount);
+			}
+		}
+
+		if (tx.date.startsWith(previousMonthPrefix)) {
+			if (tx.amount > 0) {
+				previousMonthIncome += tx.amount;
+			} else {
+				previousMonthExpenses += Math.abs(tx.amount);
 			}
 		}
 
@@ -97,6 +113,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 		}
 	}
+
+	const percentChange = (current: number, previous: number): number => {
+		if (previous === 0) return current === 0 ? 0 : 100;
+		return Math.round(((current - previous) / previous) * 1000) / 10;
+	};
+
+	const incomeChangePct = percentChange(monthlyIncome, previousMonthIncome);
+	const expenseChangePct = percentChange(monthlyExpenses, previousMonthExpenses);
 
 	const categorySpend: CategorySpend[] = [...categoryTotals.values()]
 		.sort((a, b) => b.total - a.total)
@@ -123,6 +147,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		transactions: transactionRows,
 		monthlyIncome,
 		monthlyExpenses,
+		incomeChangePct,
+		expenseChangePct,
 		categorySpend,
 		monthlyBudgetCap,
 		weeklySpend
