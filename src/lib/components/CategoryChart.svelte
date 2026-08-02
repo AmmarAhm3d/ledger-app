@@ -25,7 +25,9 @@
 		}));
 	});
 
-	let totalDisplay = $derived(formatPKR(categories.reduce((sum, c) => sum + c.baseAmount, 0)));
+	let totalDisplay = $derived(
+		formatPKR(categories.reduce((sum, c) => sum + c.baseAmount, 0) * multiplier[range])
+	);
 </script>
 
 <div class="rounded-[13px] border border-border bg-panel">

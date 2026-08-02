@@ -28,10 +28,12 @@
 		class="fixed inset-0 z-45 flex items-center justify-center bg-black/60 backdrop-blur-[2px]"
 	>
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			onclick={(e) => e.stopPropagation()}
-			role="presentation"
+			role="dialog"
+			aria-modal="true"
+			aria-label="Enter your PIN"
+			tabindex="-1"
 			class="flex w-74 flex-col items-center gap-3.5 rounded-2xl border border-border-strong bg-panel-2 p-5.5 shadow-2xl"
 		>
 			<div

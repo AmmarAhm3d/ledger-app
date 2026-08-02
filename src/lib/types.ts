@@ -5,7 +5,7 @@ export type AccountType = 'Bank' | 'Microfinance / Wallet' | 'Cash';
 export interface Account {
 	id: number;
 	name: string;
-	type: string;
+	type: AccountType;
 	balance: number;
 }
 

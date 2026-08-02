@@ -1,8 +1,8 @@
 import type { Account, CategorySpend, Transaction } from './types';
 
 export const initialAccounts: Account[] = [
-	{ id: 1, name: 'Meezan Bank', type: 'Bank · savings', balance: 12480 },
-	{ id: 2, name: 'Bank Alfalah', type: 'Bank · company', balance: 9200 },
+	{ id: 1, name: 'Meezan Bank', type: 'Bank', balance: 12480 },
+	{ id: 2, name: 'Bank Alfalah', type: 'Bank', balance: 9200 },
 	{ id: 3, name: 'JazzCash', type: 'Microfinance / Wallet', balance: 1340 },
 	{ id: 4, name: 'SadaPay', type: 'Microfinance / Wallet', balance: 980 },
 	{ id: 5, name: 'Easypaisa', type: 'Microfinance / Wallet', balance: 318 }

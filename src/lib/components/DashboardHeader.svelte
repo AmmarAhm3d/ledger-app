@@ -23,16 +23,21 @@
 		>
 			<Search size={14} strokeWidth={2} class="text-muted" />
 			<input
+				type="search"
+				aria-label="Search transactions"
 				placeholder="Search transactions"
 				class="w-full border-none bg-transparent text-[13px] text-ink outline-none placeholder:text-faint"
 			/>
 		</div>
 		<button
+			type="button"
+			aria-label="Notifications"
 			class="flex h-8.5 w-8.5 items-center justify-center rounded-[9px] border border-border bg-panel text-dim transition-colors duration-100 hover:bg-panel-hover"
 		>
 			<Bell size={15} strokeWidth={1.9} />
 		</button>
 		<button
+			type="button"
 			onclick={onAddTransaction}
 			class="flex items-center gap-1.5 rounded-[9px] bg-ink px-3.5 py-2 text-[13px] font-semibold text-bg transition-colors duration-150 hover:bg-dim active:translate-y-px"
 		>
