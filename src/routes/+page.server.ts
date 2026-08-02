@@ -289,6 +289,7 @@ export const actions: Actions = {
 			const blob = await put(`receipts/${Date.now()}.${extension}`, receipt, {
 				access: 'private',
 				addRandomSuffix: true,
+				multipart: true,
 				oidcToken: env.VERCEL_OIDC_TOKEN,
 				storeId: env.BLOB_STORE_ID
 			});
