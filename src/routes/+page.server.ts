@@ -1,4 +1,4 @@
-import { fail } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, categories } from '$lib/server/db/schema';
@@ -8,7 +8,20 @@ import type { Actions, PageServerLoad } from './$types';
 const ACCOUNT_TYPES: readonly AccountType[] = ['Bank', 'Microfinance / Wallet', 'Cash'];
 
 function parseAmount(raw: FormDataEntryValue | null): number {
-	return Number(String(raw ?? '').replace(/[^0-9.-]/g, ''));
+	const cleaned = String(raw ?? '').replace(/[^0-9.-]/g, '');
+	return cleaned === '' ? NaN : Number(cleaned);
+}
+
+function parseId(raw: FormDataEntryValue | null): number {
+	const id = Number(raw);
+	return Number.isInteger(id) && id > 0 ? id : NaN;
+}
+
+function toAccountType(value: string): AccountType {
+	if (!ACCOUNT_TYPES.includes(value as AccountType)) {
+		throw error(500, `Unexpected account type in database: ${value}`);
+	}
+	return value as AccountType;
 }
 
 export const load: PageServerLoad = async () => {
@@ -21,7 +34,7 @@ export const load: PageServerLoad = async () => {
 		accounts: accountRows.map((a) => ({
 			id: a.id,
 			name: a.name,
-			type: a.type as AccountType,
+			type: toAccountType(a.type),
 			balance: a.balance
 		})),
 		categories: categoryRows.map((c) => ({
@@ -49,7 +62,7 @@ export const actions: Actions = {
 
 	removeAccount: async ({ request }) => {
 		const form = await request.formData();
-		const id = Number(form.get('id'));
+		const id = parseId(form.get('id'));
 		if (Number.isNaN(id)) return fail(400, { message: 'Invalid account id' });
 
 		await db.delete(accounts).where(eq(accounts.id, id));
@@ -57,7 +70,7 @@ export const actions: Actions = {
 
 	updateAccountBalance: async ({ request }) => {
 		const form = await request.formData();
-		const id = Number(form.get('id'));
+		const id = parseId(form.get('id'));
 		const balance = parseAmount(form.get('balance'));
 
 		if (Number.isNaN(id)) return fail(400, { message: 'Invalid account id' });
@@ -79,7 +92,7 @@ export const actions: Actions = {
 
 	removeCategory: async ({ request }) => {
 		const form = await request.formData();
-		const id = Number(form.get('id'));
+		const id = parseId(form.get('id'));
 		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
 
 		await db.delete(categories).where(eq(categories.id, id));
