@@ -29,6 +29,13 @@
       "when": 1785763135641,
       "tag": "0003_real_blue_marvel",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1785764144008,
+      "tag": "0004_fearless_wong",
+      "breakpoints": true
     }
   ]
 }

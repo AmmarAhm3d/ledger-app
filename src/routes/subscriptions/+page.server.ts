@@ -14,7 +14,7 @@ function parseCadence(raw: FormDataEntryValue | null): Cadence | null {
 }
 
 // Subscriptions due within this many days are surfaced as "upcoming".
-export const UPCOMING_WINDOW_DAYS = 14;
+const UPCOMING_WINDOW_DAYS = 14;
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
