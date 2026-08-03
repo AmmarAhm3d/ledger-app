@@ -1,9 +1,10 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, desc, eq, inArray, like, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, like, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
 import { parseAmount, parseId } from '$lib/server/form-utils';
 import { logger } from '$lib/server/logger';
+import { logAudit } from '$lib/server/audit';
 import { validate } from '$lib/server/result';
 import { deleteTransactionsSchema, updateTransactionSchema } from '$lib/schema';
 import type { Actions, PageServerLoad } from './$types';
@@ -27,7 +28,7 @@ export const load: PageServerLoad = async ({ locals, parent, url }) => {
 	const categoryId = parseId(url.searchParams.get('category'));
 	const search = url.searchParams.get('search')?.trim() ?? '';
 
-	const filters = [eq(transactions.user_id, userId)];
+	const filters = [eq(transactions.user_id, userId), isNull(transactions.deleted_at)];
 	if (!Number.isNaN(categoryId)) filters.push(eq(transactions.category_id, categoryId));
 	if (search) filters.push(like(transactions.description, `%${search}%`));
 	const whereClause = and(...filters);
@@ -106,17 +107,24 @@ export const actions: Actions = {
 		const [ownedCategory] = await db
 			.select({ id: categories.id })
 			.from(categories)
-			.where(and(eq(categories.id, categoryId), eq(categories.user_id, userId)));
+			.where(
+				and(
+					eq(categories.id, categoryId),
+					eq(categories.user_id, locals.user.id),
+					isNull(categories.deleted_at)
+				)
+			);
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
 		const [existing] = await db
-			.select({ amount: transactions.amount, account_id: transactions.account_id })
+			.select()
 			.from(transactions)
 			.where(
 				and(
 					eq(transactions.id, id),
 					eq(transactions.user_id, userId),
-					eq(transactions.is_transfer, false)
+					eq(transactions.is_transfer, false),
+					isNull(transactions.deleted_at)
 				)
 			);
 		if (!existing) return fail(400, { message: 'Invalid transaction' });
@@ -125,7 +133,7 @@ export const actions: Actions = {
 
 		try {
 			await db.transaction(async (tx) => {
-				await tx
+				const [updated] = await tx
 					.update(transactions)
 					.set({ description, amount, date, category_id: categoryId })
 					.where(
@@ -134,7 +142,8 @@ export const actions: Actions = {
 							eq(transactions.user_id, userId),
 							eq(transactions.is_transfer, false)
 						)
-					);
+					)
+					.returning();
 
 				if (delta !== 0) {
 					await tx
@@ -142,6 +151,15 @@ export const actions: Actions = {
 						.set({ balance: sql`${accounts.balance} + ${delta}` })
 						.where(eq(accounts.id, existing.account_id));
 				}
+
+				await logAudit(tx, {
+					userId,
+					entityType: 'transaction',
+					entityId: id,
+					action: 'update',
+					oldValues: existing,
+					newValues: updated
+				});
 			});
 			logger.info('Transaction updated', { userId: locals.user.id, transactionId: id });
 		} catch (error) {
@@ -175,17 +193,14 @@ export const actions: Actions = {
 		const { ids } = result.data;
 
 		const rowsToDelete = await db
-			.select({
-				id: transactions.id,
-				amount: transactions.amount,
-				account_id: transactions.account_id
-			})
+			.select()
 			.from(transactions)
 			.where(
 				and(
 					inArray(transactions.id, ids),
 					eq(transactions.user_id, userId),
-					eq(transactions.is_transfer, false)
+					eq(transactions.is_transfer, false),
+					isNull(transactions.deleted_at)
 				)
 			);
 
@@ -198,18 +213,31 @@ export const actions: Actions = {
 
 		try {
 			await db.transaction(async (tx) => {
-				await tx.delete(transactions).where(
-					inArray(
-						transactions.id,
-						rowsToDelete.map((row) => row.id)
-					)
-				);
+				await tx
+					.update(transactions)
+					.set({ deleted_at: sql`(current_timestamp)` })
+					.where(
+						inArray(
+							transactions.id,
+							rowsToDelete.map((row) => row.id)
+						)
+					);
 
 				for (const [accountId, delta] of balanceDeltas) {
 					await tx
 						.update(accounts)
 						.set({ balance: sql`${accounts.balance} + ${delta}` })
 						.where(eq(accounts.id, accountId));
+				}
+
+				for (const existing of rowsToDelete) {
+					await logAudit(tx, {
+						userId,
+						entityType: 'transaction',
+						entityId: existing.id,
+						action: 'delete',
+						oldValues: existing
+					});
 				}
 			});
 			logger.info('Transactions deleted', { userId: locals.user.id, count: rowsToDelete.length });

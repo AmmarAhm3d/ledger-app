@@ -1,11 +1,12 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { put } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
 import { parseAmount, parseOptionalAmount, parseId } from '$lib/server/form-utils';
 import { logger } from '$lib/server/logger';
+import { logAudit } from '$lib/server/audit';
 import { err, ok, validate, type Result } from '$lib/server/result';
 import {
 	addAccountSchema,
@@ -44,7 +45,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		.from(transactions)
 		.innerJoin(accounts, eq(transactions.account_id, accounts.id))
 		.leftJoin(categories, eq(transactions.category_id, categories.id))
-		.where(eq(transactions.user_id, userId))
+		.where(and(eq(transactions.user_id, userId), isNull(transactions.deleted_at)))
 		.orderBy(desc(transactions.date), desc(transactions.id));
 
 	const now = new Date();
@@ -172,7 +173,20 @@ export const actions: Actions = {
 		const { name, type, balance } = result.data;
 
 		try {
-			await db.insert(accounts).values({ name, type, balance, user_id: locals.user.id });
+			await db.transaction(async (tx) => {
+				const [created] = await tx
+					.insert(accounts)
+					.values({ name, type, balance, user_id: locals.user!.id })
+					.returning();
+
+				await logAudit(tx, {
+					userId: locals.user!.id,
+					entityType: 'account',
+					entityId: created.id,
+					action: 'create',
+					newValues: created
+				});
+			});
 			logger.info('Account created', { userId: locals.user.id, name, type });
 		} catch (error) {
 			logger.error('Failed to insert account', { userId: locals.user.id, error });
@@ -192,9 +206,32 @@ export const actions: Actions = {
 		const { id } = result.data;
 
 		try {
-			await db
-				.delete(accounts)
-				.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
+			await db.transaction(async (tx) => {
+				const [existing] = await tx
+					.select()
+					.from(accounts)
+					.where(
+						and(
+							eq(accounts.id, id),
+							eq(accounts.user_id, locals.user!.id),
+							isNull(accounts.deleted_at)
+						)
+					);
+				if (!existing) return;
+
+				await tx
+					.update(accounts)
+					.set({ deleted_at: sql`(current_timestamp)` })
+					.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user!.id)));
+
+				await logAudit(tx, {
+					userId: locals.user!.id,
+					entityType: 'account',
+					entityId: id,
+					action: 'delete',
+					oldValues: existing
+				});
+			});
 			logger.info('Account removed', { userId: locals.user.id, accountId: id });
 		} catch (error) {
 			logger.error('Failed to delete account', { userId: locals.user.id, accountId: id, error });
@@ -220,10 +257,34 @@ export const actions: Actions = {
 		const { id, balance } = result.data;
 
 		try {
-			await db
-				.update(accounts)
-				.set({ balance })
-				.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
+			await db.transaction(async (tx) => {
+				const [existing] = await tx
+					.select()
+					.from(accounts)
+					.where(
+						and(
+							eq(accounts.id, id),
+							eq(accounts.user_id, locals.user!.id),
+							isNull(accounts.deleted_at)
+						)
+					);
+				if (!existing) return;
+
+				const [updated] = await tx
+					.update(accounts)
+					.set({ balance })
+					.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user!.id)))
+					.returning();
+
+				await logAudit(tx, {
+					userId: locals.user!.id,
+					entityType: 'account',
+					entityId: id,
+					action: 'update',
+					oldValues: existing,
+					newValues: updated
+				});
+			});
 			logger.info('Account balance updated', { userId: locals.user.id, accountId: id });
 		} catch (error) {
 			logger.error('Failed to update account balance', {
@@ -262,13 +323,25 @@ export const actions: Actions = {
 		const [ownedAccount] = await db
 			.select({ id: accounts.id })
 			.from(accounts)
-			.where(and(eq(accounts.id, account_id), eq(accounts.user_id, locals.user.id)));
+			.where(
+				and(
+					eq(accounts.id, account_id),
+					eq(accounts.user_id, locals.user.id),
+					isNull(accounts.deleted_at)
+				)
+			);
 		if (!ownedAccount) return fail(400, { message: 'Invalid account' });
 
 		const [ownedCategory] = await db
 			.select({ id: categories.id })
 			.from(categories)
-			.where(and(eq(categories.id, category_id), eq(categories.user_id, locals.user.id)));
+			.where(
+				and(
+					eq(categories.id, category_id),
+					eq(categories.user_id, locals.user.id),
+					isNull(categories.deleted_at)
+				)
+			);
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
 		let receiptUrl: string | null = null;
@@ -280,21 +353,32 @@ export const actions: Actions = {
 
 		try {
 			await db.transaction(async (tx) => {
-				await tx.insert(transactions).values({
-					amount: signedAmount,
-					description,
-					account_id,
-					category_id,
-					date,
-					has_receipt: receiptUrl !== null,
-					receipt_url: receiptUrl,
-					user_id: userId
-				});
+				const [created] = await tx
+					.insert(transactions)
+					.values({
+						amount: signedAmount,
+						description,
+						account_id,
+						category_id,
+						date,
+						has_receipt: receiptUrl !== null,
+						receipt_url: receiptUrl,
+						user_id: userId
+					})
+					.returning();
 
 				await tx
 					.update(accounts)
 					.set({ balance: sql`${accounts.balance} + ${signedAmount}` })
 					.where(eq(accounts.id, account_id));
+
+				await logAudit(tx, {
+					userId,
+					entityType: 'transaction',
+					entityId: created.id,
+					action: 'create',
+					newValues: created
+				});
 			});
 			logger.info('Transaction created', { userId, type, accountId: account_id });
 		} catch (error) {
@@ -329,14 +413,26 @@ export const actions: Actions = {
 
 		const [fromAccount, toAccount] = await Promise.all([
 			db
-				.select({ id: accounts.id, name: accounts.name })
+				.select()
 				.from(accounts)
-				.where(and(eq(accounts.id, fromAccountId), eq(accounts.user_id, userId)))
+				.where(
+					and(
+						eq(accounts.id, fromAccountId),
+						eq(accounts.user_id, userId),
+						isNull(accounts.deleted_at)
+					)
+				)
 				.then((rows) => rows[0]),
 			db
-				.select({ id: accounts.id, name: accounts.name })
+				.select()
 				.from(accounts)
-				.where(and(eq(accounts.id, toAccountId), eq(accounts.user_id, userId)))
+				.where(
+					and(
+						eq(accounts.id, toAccountId),
+						eq(accounts.user_id, userId),
+						isNull(accounts.deleted_at)
+					)
+				)
 				.then((rows) => rows[0])
 		]);
 		if (!fromAccount) return fail(400, { message: 'Invalid source account' });
@@ -344,36 +440,73 @@ export const actions: Actions = {
 
 		try {
 			await db.transaction(async (tx) => {
-				await tx
+				const [updatedFromAccount] = await tx
 					.update(accounts)
 					.set({ balance: sql`${accounts.balance} - ${amount}` })
-					.where(eq(accounts.id, fromAccountId));
+					.where(eq(accounts.id, fromAccountId))
+					.returning();
 
-				await tx
+				const [updatedToAccount] = await tx
 					.update(accounts)
 					.set({ balance: sql`${accounts.balance} + ${amount}` })
-					.where(eq(accounts.id, toAccountId));
+					.where(eq(accounts.id, toAccountId))
+					.returning();
 
-				await tx.insert(transactions).values([
-					{
-						amount: -Math.abs(amount),
-						description: description ?? `Transfer to ${toAccount.name}`,
-						account_id: fromAccountId,
-						category_id: null,
-						is_transfer: true,
-						date,
-						user_id: userId
-					},
-					{
-						amount: Math.abs(amount),
-						description: description ?? `Transfer from ${fromAccount.name}`,
-						account_id: toAccountId,
-						category_id: null,
-						is_transfer: true,
-						date,
-						user_id: userId
-					}
-				]);
+				await logAudit(tx, {
+					userId,
+					entityType: 'account',
+					entityId: fromAccountId,
+					action: 'update',
+					oldValues: fromAccount,
+					newValues: updatedFromAccount
+				});
+				await logAudit(tx, {
+					userId,
+					entityType: 'account',
+					entityId: toAccountId,
+					action: 'update',
+					oldValues: toAccount,
+					newValues: updatedToAccount
+				});
+
+				const [fromTransaction, toTransaction] = await tx
+					.insert(transactions)
+					.values([
+						{
+							amount: -Math.abs(amount),
+							description: description ?? `Transfer to ${toAccount.name}`,
+							account_id: fromAccountId,
+							category_id: null,
+							is_transfer: true,
+							date,
+							user_id: userId
+						},
+						{
+							amount: Math.abs(amount),
+							description: description ?? `Transfer from ${fromAccount.name}`,
+							account_id: toAccountId,
+							category_id: null,
+							is_transfer: true,
+							date,
+							user_id: userId
+						}
+					])
+					.returning();
+
+				await logAudit(tx, {
+					userId,
+					entityType: 'transaction',
+					entityId: fromTransaction.id,
+					action: 'create',
+					newValues: fromTransaction
+				});
+				await logAudit(tx, {
+					userId,
+					entityType: 'transaction',
+					entityId: toTransaction.id,
+					action: 'create',
+					newValues: toTransaction
+				});
 			});
 			logger.info('Transfer completed', { userId, fromAccountId, toAccountId });
 		} catch (error) {

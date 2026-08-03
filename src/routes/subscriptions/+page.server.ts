@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, categories, recurringSubscriptions } from '$lib/server/db/schema';
 import { parseAmount, parseId } from '$lib/server/form-utils';
@@ -84,14 +84,26 @@ export const actions: Actions = {
 			const [owned] = await db
 				.select({ id: categories.id })
 				.from(categories)
-				.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
+				.where(
+					and(
+						eq(categories.id, categoryId),
+						eq(categories.user_id, locals.user.id),
+						isNull(categories.deleted_at)
+					)
+				);
 			if (!owned) return fail(400, { message: 'Invalid category' });
 		}
 		if (!Number.isNaN(accountId)) {
 			const [owned] = await db
 				.select({ id: accounts.id })
 				.from(accounts)
-				.where(and(eq(accounts.id, accountId), eq(accounts.user_id, locals.user.id)));
+				.where(
+					and(
+						eq(accounts.id, accountId),
+						eq(accounts.user_id, locals.user.id),
+						isNull(accounts.deleted_at)
+					)
+				);
 			if (!owned) return fail(400, { message: 'Invalid account' });
 		}
 
@@ -131,14 +143,26 @@ export const actions: Actions = {
 			const [owned] = await db
 				.select({ id: categories.id })
 				.from(categories)
-				.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
+				.where(
+					and(
+						eq(categories.id, categoryId),
+						eq(categories.user_id, locals.user.id),
+						isNull(categories.deleted_at)
+					)
+				);
 			if (!owned) return fail(400, { message: 'Invalid category' });
 		}
 		if (!Number.isNaN(accountId)) {
 			const [owned] = await db
 				.select({ id: accounts.id })
 				.from(accounts)
-				.where(and(eq(accounts.id, accountId), eq(accounts.user_id, locals.user.id)));
+				.where(
+					and(
+						eq(accounts.id, accountId),
+						eq(accounts.user_id, locals.user.id),
+						isNull(accounts.deleted_at)
+					)
+				);
 			if (!owned) return fail(400, { message: 'Invalid account' });
 		}
 
