@@ -5,22 +5,22 @@ import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
 import { parseAmount, parseOptionalAmount, parseId } from '$lib/server/form-utils';
-import type { AccountType, CategorySpend } from '$lib/types';
+import { logger } from '$lib/server/logger';
+import { err, ok, validate, type Result } from '$lib/server/result';
+import {
+	addAccountSchema,
+	addTransactionSchema,
+	ALLOWED_RECEIPT_TYPES,
+	receiptFileSchema,
+	removeAccountSchema,
+	transferSchema,
+	updateAccountBalanceSchema
+} from '$lib/schema';
+import type { CategorySpend } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
-
-const ACCOUNT_TYPES: readonly AccountType[] = ['Bank', 'Microfinance / Wallet', 'Cash'];
 
 const CATEGORY_COLORS = ['#F4F4F5', '#818CF8', '#A5B4FC', '#6366F1', '#4338CA', '#3F3F46'];
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
-const ALLOWED_RECEIPT_TYPES: Record<string, string> = {
-	'image/jpeg': 'jpg',
-	'image/png': 'png',
-	'image/webp': 'webp',
-	'image/heic': 'heic',
-	'application/pdf': 'pdf'
-};
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
@@ -130,117 +130,169 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 	};
 };
 
+/**
+ * Uploads a receipt file to Vercel Blob. Returns a Result rather than throwing,
+ * since callers (the addTransaction action) need to turn a failure into a
+ * `fail(400, { message })` while a success just carries the blob URL onward.
+ */
+async function uploadReceipt(receipt: File): Promise<Result<string, string>> {
+	const parsed = validate(receiptFileSchema, receipt);
+	if (!parsed.success) return err(parsed.error);
+
+	const extension = ALLOWED_RECEIPT_TYPES[receipt.type];
+	try {
+		const blob = await put(`receipts/${Date.now()}.${extension}`, receipt, {
+			access: 'private',
+			addRandomSuffix: true,
+			multipart: true,
+			oidcToken: env.VERCEL_OIDC_TOKEN,
+			storeId: env.BLOB_STORE_ID
+		});
+		return ok(blob.url);
+	} catch (error) {
+		logger.error('Failed to upload receipt to blob storage', { error });
+		return err('Failed to upload receipt');
+	}
+}
+
 export const actions: Actions = {
 	addAccount: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const name = String(form.get('name') ?? '').trim();
-		const type = String(form.get('type') ?? '');
-		const balance = parseOptionalAmount(form.get('balance'));
 
-		if (!name) return fail(400, { message: 'Account name is required' });
-		if (!ACCOUNT_TYPES.includes(type as AccountType))
-			return fail(400, { message: 'Invalid account type' });
-		if (Number.isNaN(balance)) return fail(400, { message: 'Balance must be a number' });
+		const result = validate(addAccountSchema, {
+			name: form.get('name')?.toString() ?? '',
+			type: form.get('type')?.toString() ?? '',
+			balance: parseOptionalAmount(form.get('balance'))
+		});
+		if (!result.success) {
+			logger.warn('addAccount validation failed', { userId: locals.user.id, error: result.error });
+			return fail(400, { message: result.error });
+		}
+		const { name, type, balance } = result.data;
 
-		await db.insert(accounts).values({ name, type, balance, user_id: locals.user.id });
+		try {
+			await db.insert(accounts).values({ name, type, balance, user_id: locals.user.id });
+			logger.info('Account created', { userId: locals.user.id, name, type });
+		} catch (error) {
+			logger.error('Failed to insert account', { userId: locals.user.id, error });
+			throw error;
+		}
 	},
 
 	removeAccount: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid account id' });
 
-		await db
-			.delete(accounts)
-			.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
+		const result = validate(removeAccountSchema, { id: parseId(form.get('id')) });
+		if (!result.success) {
+			logger.warn('removeAccount validation failed', { userId: locals.user.id, error: result.error });
+			return fail(400, { message: result.error });
+		}
+		const { id } = result.data;
+
+		try {
+			await db
+				.delete(accounts)
+				.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
+			logger.info('Account removed', { userId: locals.user.id, accountId: id });
+		} catch (error) {
+			logger.error('Failed to delete account', { userId: locals.user.id, accountId: id, error });
+			throw error;
+		}
 	},
 
 	updateAccountBalance: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		const balance = parseAmount(form.get('balance'));
 
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid account id' });
-		if (Number.isNaN(balance)) return fail(400, { message: 'Balance must be a number' });
+		const result = validate(updateAccountBalanceSchema, {
+			id: parseId(form.get('id')),
+			balance: parseAmount(form.get('balance'))
+		});
+		if (!result.success) {
+			logger.warn('updateAccountBalance validation failed', {
+				userId: locals.user.id,
+				error: result.error
+			});
+			return fail(400, { message: result.error });
+		}
+		const { id, balance } = result.data;
 
-		await db
-			.update(accounts)
-			.set({ balance })
-			.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
+		try {
+			await db
+				.update(accounts)
+				.set({ balance })
+				.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
+			logger.info('Account balance updated', { userId: locals.user.id, accountId: id });
+		} catch (error) {
+			logger.error('Failed to update account balance', {
+				userId: locals.user.id,
+				accountId: id,
+				error
+			});
+			throw error;
+		}
 	},
 
 	addTransaction: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const formData = await request.formData();
-
-		const amount = parseAmount(formData.get('amount'));
-		const description = formData.get('description')?.toString().trim() || null;
-		const accountId = parseId(formData.get('account_id'));
-		const categoryId = parseId(formData.get('category_id'));
-		const date = formData.get('date')?.toString();
 		const receipt = formData.get('receipt');
-		const type = formData.get('type')?.toString();
 
-		if (
-			!Number.isFinite(amount) ||
-			Number.isNaN(accountId) ||
-			Number.isNaN(categoryId) ||
-			!date
-		) {
-			return fail(400, { message: 'Missing required fields' });
+		const result = validate(addTransactionSchema, {
+			amount: parseAmount(formData.get('amount')),
+			description: formData.get('description'),
+			account_id: parseId(formData.get('account_id')),
+			category_id: parseId(formData.get('category_id')),
+			date: formData.get('date')?.toString() ?? '',
+			type: formData.get('type')?.toString()
+		});
+		if (!result.success) {
+			logger.warn('addTransaction validation failed', {
+				userId: locals.user.id,
+				error: result.error
+			});
+			return fail(400, { message: result.error });
 		}
-
-		if (type !== 'income' && type !== 'expense') {
-			return fail(400, { message: 'Invalid transaction type' });
-		}
-
+		const { amount, description, account_id, category_id, date, type } = result.data;
 		const signedAmount = type === 'income' ? Math.abs(amount) : -Math.abs(amount);
 
 		const [ownedAccount] = await db
 			.select({ id: accounts.id })
 			.from(accounts)
-			.where(and(eq(accounts.id, accountId), eq(accounts.user_id, locals.user.id)));
+			.where(and(eq(accounts.id, account_id), eq(accounts.user_id, locals.user.id)));
 		if (!ownedAccount) return fail(400, { message: 'Invalid account' });
 
 		const [ownedCategory] = await db
 			.select({ id: categories.id })
 			.from(categories)
-			.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
+			.where(and(eq(categories.id, category_id), eq(categories.user_id, locals.user.id)));
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
 		let receiptUrl: string | null = null;
 		if (receipt instanceof File && receipt.size > 0) {
-			const extension = ALLOWED_RECEIPT_TYPES[receipt.type];
-			if (!extension) {
-				return fail(400, { message: 'Receipt must be a JPG, PNG, WEBP, HEIC, or PDF file' });
-			}
-			if (receipt.size > MAX_RECEIPT_BYTES) {
-				return fail(400, { message: 'Receipt must be smaller than 10 MB' });
-			}
-
-			const blob = await put(`receipts/${Date.now()}.${extension}`, receipt, {
-				access: 'private',
-				addRandomSuffix: true,
-				multipart: true,
-				oidcToken: env.VERCEL_OIDC_TOKEN,
-				storeId: env.BLOB_STORE_ID
-			});
-			receiptUrl = blob.url;
+			const uploadResult = await uploadReceipt(receipt);
+			if (!uploadResult.success) return fail(400, { message: uploadResult.error });
+			receiptUrl = uploadResult.data;
 		}
 
-		await db.insert(transactions).values({
-			amount: signedAmount,
-			description,
-			account_id: accountId,
-			category_id: categoryId,
-			date,
-			has_receipt: receiptUrl !== null,
-			receipt_url: receiptUrl,
-			user_id: locals.user.id
-		});
+		try {
+			await db.insert(transactions).values({
+				amount: signedAmount,
+				description,
+				account_id,
+				category_id,
+				date,
+				has_receipt: receiptUrl !== null,
+				receipt_url: receiptUrl,
+				user_id: locals.user.id
+			});
+			logger.info('Transaction created', { userId: locals.user.id, type, accountId: account_id });
+		} catch (error) {
+			logger.error('Failed to insert transaction', { userId: locals.user.id, error });
+			throw error;
+		}
 	},
 
 	transfer: async ({ request, locals }) => {
@@ -248,21 +300,24 @@ export const actions: Actions = {
 		const userId = locals.user.id;
 		const form = await request.formData();
 
-		const fromAccountId = parseId(form.get('from_account_id'));
-		const toAccountId = parseId(form.get('to_account_id'));
-		const amount = parseAmount(form.get('amount'));
-		const description = form.get('description')?.toString().trim() || null;
-		const date = form.get('date')?.toString();
-
-		if (Number.isNaN(fromAccountId) || Number.isNaN(toAccountId) || !date) {
-			return fail(400, { message: 'Missing required fields' });
+		const result = validate(transferSchema, {
+			from_account_id: parseId(form.get('from_account_id')),
+			to_account_id: parseId(form.get('to_account_id')),
+			amount: parseAmount(form.get('amount')),
+			description: form.get('description'),
+			date: form.get('date')?.toString() ?? ''
+		});
+		if (!result.success) {
+			logger.warn('transfer validation failed', { userId, error: result.error });
+			return fail(400, { message: result.error });
 		}
-		if (fromAccountId === toAccountId) {
-			return fail(400, { message: 'Choose two different accounts' });
-		}
-		if (!Number.isFinite(amount) || amount <= 0) {
-			return fail(400, { message: 'Amount must be a positive number' });
-		}
+		const {
+			from_account_id: fromAccountId,
+			to_account_id: toAccountId,
+			amount,
+			description,
+			date
+		} = result.data;
 
 		const [fromAccount, toAccount] = await Promise.all([
 			db
@@ -279,37 +334,43 @@ export const actions: Actions = {
 		if (!fromAccount) return fail(400, { message: 'Invalid source account' });
 		if (!toAccount) return fail(400, { message: 'Invalid destination account' });
 
-		await db.transaction(async (tx) => {
-			await tx
-				.update(accounts)
-				.set({ balance: sql`${accounts.balance} - ${amount}` })
-				.where(eq(accounts.id, fromAccountId));
+		try {
+			await db.transaction(async (tx) => {
+				await tx
+					.update(accounts)
+					.set({ balance: sql`${accounts.balance} - ${amount}` })
+					.where(eq(accounts.id, fromAccountId));
 
-			await tx
-				.update(accounts)
-				.set({ balance: sql`${accounts.balance} + ${amount}` })
-				.where(eq(accounts.id, toAccountId));
+				await tx
+					.update(accounts)
+					.set({ balance: sql`${accounts.balance} + ${amount}` })
+					.where(eq(accounts.id, toAccountId));
 
-			await tx.insert(transactions).values([
-				{
-					amount: -Math.abs(amount),
-					description: description ?? `Transfer to ${toAccount.name}`,
-					account_id: fromAccountId,
-					category_id: null,
-					is_transfer: true,
-					date,
-					user_id: userId
-				},
-				{
-					amount: Math.abs(amount),
-					description: description ?? `Transfer from ${fromAccount.name}`,
-					account_id: toAccountId,
-					category_id: null,
-					is_transfer: true,
-					date,
-					user_id: userId
-				}
-			]);
-		});
+				await tx.insert(transactions).values([
+					{
+						amount: -Math.abs(amount),
+						description: description ?? `Transfer to ${toAccount.name}`,
+						account_id: fromAccountId,
+						category_id: null,
+						is_transfer: true,
+						date,
+						user_id: userId
+					},
+					{
+						amount: Math.abs(amount),
+						description: description ?? `Transfer from ${fromAccount.name}`,
+						account_id: toAccountId,
+						category_id: null,
+						is_transfer: true,
+						date,
+						user_id: userId
+					}
+				]);
+			});
+			logger.info('Transfer completed', { userId, fromAccountId, toAccountId });
+		} catch (error) {
+			logger.error('Failed to complete transfer', { userId, fromAccountId, toAccountId, error });
+			throw error;
+		}
 	}
 };
