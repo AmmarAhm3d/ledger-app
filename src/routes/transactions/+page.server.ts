@@ -3,6 +3,9 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
 import { parseAmount, parseId } from '$lib/server/form-utils';
+import { logger } from '$lib/server/logger';
+import { validate } from '$lib/server/result';
+import { deleteTransactionsSchema, updateTransactionSchema } from '$lib/schema';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
@@ -42,16 +45,21 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 
-		const id = parseId(form.get('id'));
-		const description = form.get('description')?.toString().trim() || null;
-		const amount = parseAmount(form.get('amount'));
-		const date = form.get('date')?.toString();
-		const categoryId = parseId(form.get('category_id'));
-
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid transaction id' });
-		if (!Number.isFinite(amount)) return fail(400, { message: 'Amount must be a number' });
-		if (!date) return fail(400, { message: 'Date is required' });
-		if (Number.isNaN(categoryId)) return fail(400, { message: 'Invalid category' });
+		const result = validate(updateTransactionSchema, {
+			id: parseId(form.get('id')),
+			description: form.get('description'),
+			amount: parseAmount(form.get('amount')),
+			date: form.get('date')?.toString() ?? '',
+			category_id: parseId(form.get('category_id'))
+		});
+		if (!result.success) {
+			logger.warn('updateTransaction validation failed', {
+				userId: locals.user.id,
+				error: result.error
+			});
+			return fail(400, { message: result.error });
+		}
+		const { id, description, amount, date, category_id: categoryId } = result.data;
 
 		const [ownedCategory] = await db
 			.select({ id: categories.id })
@@ -59,36 +67,61 @@ export const actions: Actions = {
 			.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
-		await db
-			.update(transactions)
-			.set({ description, amount, date, category_id: categoryId })
-			.where(
-				and(
-					eq(transactions.id, id),
-					eq(transactions.user_id, locals.user.id),
-					eq(transactions.is_transfer, false)
-				)
-			);
+		try {
+			await db
+				.update(transactions)
+				.set({ description, amount, date, category_id: categoryId })
+				.where(
+					and(
+						eq(transactions.id, id),
+						eq(transactions.user_id, locals.user.id),
+						eq(transactions.is_transfer, false)
+					)
+				);
+			logger.info('Transaction updated', { userId: locals.user.id, transactionId: id });
+		} catch (error) {
+			logger.error('Failed to update transaction', {
+				userId: locals.user.id,
+				transactionId: id,
+				error
+			});
+			throw error;
+		}
 	},
 
 	deleteTransactions: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const ids = form
-			.getAll('ids')
-			.map((raw) => parseId(raw))
-			.filter((id) => !Number.isNaN(id));
 
-		if (ids.length === 0) return fail(400, { message: 'No transactions selected' });
+		const result = validate(deleteTransactionsSchema, {
+			ids: form
+				.getAll('ids')
+				.map((raw) => parseId(raw))
+				.filter((id) => !Number.isNaN(id))
+		});
+		if (!result.success) {
+			logger.warn('deleteTransactions validation failed', {
+				userId: locals.user.id,
+				error: result.error
+			});
+			return fail(400, { message: result.error });
+		}
+		const { ids } = result.data;
 
-		await db
-			.delete(transactions)
-			.where(
-				and(
-					inArray(transactions.id, ids),
-					eq(transactions.user_id, locals.user.id),
-					eq(transactions.is_transfer, false)
-				)
-			);
+		try {
+			await db
+				.delete(transactions)
+				.where(
+					and(
+						inArray(transactions.id, ids),
+						eq(transactions.user_id, locals.user.id),
+						eq(transactions.is_transfer, false)
+					)
+				);
+			logger.info('Transactions deleted', { userId: locals.user.id, count: ids.length });
+		} catch (error) {
+			logger.error('Failed to delete transactions', { userId: locals.user.id, error });
+			throw error;
+		}
 	}
 };
