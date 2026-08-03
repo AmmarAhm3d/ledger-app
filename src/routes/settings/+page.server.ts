@@ -4,6 +4,7 @@ import {
 	getLatestStorageSnapshot,
 	recordStorageSnapshot
 } from '$lib/server/blob';
+import { logger } from '$lib/server/logger';
 import type { Actions, PageServerLoad } from './$types';
 
 const PLAN_LIMIT_BYTES = 1000 * 1024 * 1024; // 1 GB plan limit
@@ -25,7 +26,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		storageUsage: {
 			totalBytes: snapshot?.total_bytes ?? 0,
 			blobCount: snapshot?.blob_count ?? 0,
-			createdAt: snapshot?.created_at ?? new Date().toISOString(),
+			createdAt: snapshot?.created_at ?? null,
 			limitBytes: PLAN_LIMIT_BYTES
 		}
 	};
@@ -44,7 +45,8 @@ export const actions: Actions = {
 				totalBytes: usage.totalBytes,
 				blobCount: usage.blobCount
 			};
-		} catch {
+		} catch (err) {
+			logger.error('Settings refreshStorage action failed', { error: err });
 			return fail(500, { message: 'Failed to refresh storage usage' });
 		}
 	}
