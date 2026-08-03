@@ -38,6 +38,23 @@ Vercel Blob auth note: the SDK does not auto-read env vars in Vite/SvelteKit (on
 
 Preview-only login route (`src/routes/api/preview-login`, see #37): lets automation/visual verification sign in without a GitHub OAuth round-trip, by authenticating a single throwaway seeded user (`preview-test@ledger.local`, own isolated accounts/categories, no real data) via Better Auth's email/password provider. Requires `PREVIEW_LOGIN_SECRET`, `PREVIEW_TEST_USER_EMAIL`, `PREVIEW_TEST_USER_PASSWORD` set on Vercel, scoped to **Preview only** — the route hard-rejects when `VERCEL_ENV === 'production'` regardless of the secret. `emailAndPassword` is enabled in `src/lib/server/auth.ts` for sign-in only (`disableSignUp: true`); no public sign-up endpoint is exposed in any environment.
 
+### Visually verifying a PR against a Vercel Preview deployment
+
+Two layers gate a Preview URL, and both need to be cleared:
+
+1. **Vercel's own Deployment Protection** (the "Vercel Authentication" SSO screen) — gates *whether you can reach the deployment at all*, unrelated to this app's login.
+2. **This app's GitHub OAuth** — gates the dashboard itself once you're past layer 1.
+
+Layer 1 is cleared automatically if the browser already has an active Vercel SSO session (true for Claude in Chrome using this machine's real Chrome profile, once you've signed into Vercel there once). Layer 2 is cleared by the preview-login route above. So the working flow is:
+
+1. Get the branch's stable Preview URL (constant across rebuilds of the same branch): `ledger-app-git-<branch-name>-ammars-projects-3b535e02.vercel.app`, or read it from the Vercel bot's comment on the PR (`gh pr view <N> --json comments`).
+2. Navigate **Claude in Chrome** (not the sandboxed Browser pane — it has no way to carry Vercel's SSO cookie or attach custom headers) straight to `<preview-url>/api/preview-login?secret=<PREVIEW_LOGIN_SECRET>`.
+3. It redirects to `/`, now signed in as the throwaway preview user — click around, screenshot, submit forms normally from there.
+
+For a pure API/response-body check with no visual component, `vercel curl <url>` (or `vc curl`) is simpler — it authenticates past layer 1 using your logged-in Vercel CLI identity without needing a browser at all. Don't build custom bypass logic for layer 1; Vercel already solves it.
+
+A **new commit is required for newly added/changed env vars to take effect** — Vercel injects env vars into a deployment's runtime at deploy time, not per-request, so adding a var in the dashboard after a deployment already exists does nothing until the next deploy (a trivial commit is enough to trigger one).
+
 ## Architecture
 
 **Current state**: the UI (`src/routes/+page.svelte` and `src/lib/components/*`) is fully built but still runs on static mock data from `src/lib/data.ts` / `src/lib/types.ts`, held in page-level `$state`. The Drizzle/Turso layer (`src/lib/server/db/`) exists but nothing in `src/routes` reads from it yet — wiring real data through `load` functions / form actions is the next major piece of work.
