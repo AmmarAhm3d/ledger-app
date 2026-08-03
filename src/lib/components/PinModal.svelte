@@ -58,7 +58,7 @@
 			aria-modal="true"
 			aria-label={copy[mode].title}
 			tabindex="-1"
-			class="flex w-full max-w-full sm:max-w-[340px] flex-col items-center gap-4 rounded-t-3xl sm:rounded-3xl border border-border-strong bg-panel-2 p-6 pb-8 sm:pb-6 shadow-2xl transition-all duration-200"
+			class="flex w-full max-w-full sm:max-w-[340px] flex-col items-center gap-4 rounded-t-3xl sm:rounded-3xl border border-border-strong bg-panel-2 p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl transition-all duration-200"
 		>
 			<!-- Drag handle for mobile bottom sheet appearance -->
 			<div class="h-1 w-10 rounded-full bg-border-strong sm:hidden -mt-1 mb-1"></div>

@@ -52,7 +52,7 @@
 {/if}
 
 <aside
-	class="fixed inset-y-0 left-0 z-50 flex h-screen w-[244px] flex-none flex-col gap-6.5 border-r border-border bg-panel px-3.5 py-5 transition-transform duration-200 lg:sticky lg:top-0 lg:translate-x-0 {open
+	class="fixed inset-y-0 left-0 z-50 flex h-screen w-[244px] flex-none flex-col gap-6.5 border-r border-border bg-panel px-3.5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] transition-transform duration-200 lg:sticky lg:top-0 lg:translate-x-0 {open
 		? 'translate-x-0'
 		: '-translate-x-full'}"
 >

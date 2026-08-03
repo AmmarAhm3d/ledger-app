@@ -1,6 +1,5 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
@@ -25,8 +24,6 @@
 	}
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
-
 {#if data.user}
 	<div class="flex min-h-screen text-ink">
 		<Sidebar
@@ -47,7 +44,9 @@
 				onToggleNav={() => (mobileNavOpen = true)}
 			/>
 
-			<div class="flex flex-col gap-4 px-4 pt-5 pb-8 sm:gap-5 sm:px-6 sm:pt-6.5 sm:pb-10 lg:px-8">
+			<div
+				class="flex flex-col gap-4 px-4 pt-5 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:gap-5 sm:px-6 sm:pt-6.5 sm:pb-[calc(2.5rem+env(safe-area-inset-bottom))] lg:px-8"
+			>
 				{@render children()}
 			</div>
 		</main>
