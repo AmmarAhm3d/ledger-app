@@ -43,6 +43,13 @@
       "when": 1785765540781,
       "tag": "0005_tired_gamma_corps",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785766567480,
+      "tag": "0006_equal_eternals",
+      "breakpoints": true
     }
   ]
 }

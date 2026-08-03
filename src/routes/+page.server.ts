@@ -17,6 +17,7 @@ import {
 	transferSchema,
 	updateAccountBalanceSchema
 } from '$lib/schema';
+import { getDueSubscriptions } from '$lib/server/subscriptions';
 import type { CategorySpend } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -116,11 +117,13 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		}));
 
 	const monthlyBudgetCap = categoryRows.reduce((sum, c) => sum + c.monthly_cap, 0);
+	const suggestedTransactions = await getDueSubscriptions(userId);
 
 	return {
 		title: 'Overview',
 		subtitle: 'Synced just now',
 		transactions: transactionRows,
+		suggestedTransactions,
 		monthlyIncome,
 		monthlyExpenses,
 		incomeChangePct,

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { enhance } from '$app/forms';
 	import { getStoredPin, setStoredPin, clearStoredPin } from '$lib/pin-storage';
+	import { formatPKR } from '$lib/format';
 	import KPICards from '$lib/components/KPICards.svelte';
 	import CategoryChart from '$lib/components/CategoryChart.svelte';
 	import BudgetHealth from '$lib/components/BudgetHealth.svelte';
@@ -121,6 +123,45 @@
 	{expenseChangePct}
 	onToggleBalance={handleToggleBalance}
 />
+
+{#if data.suggestedTransactions.length > 0}
+	<section class="rounded-[13px] border border-accent/30 bg-accent/6 p-4 sm:p-4.5">
+		<div class="mb-3">
+			<div class="text-[13px] font-semibold tracking-tight text-ink">Suggested transactions</div>
+			<div class="mt-0.5 text-xs text-muted">
+				Subscriptions due — nothing is added to your ledger until you confirm.
+			</div>
+		</div>
+		<div class="flex flex-col gap-2">
+			{#each data.suggestedTransactions as sub (sub.id)}
+				<div
+					class="flex items-center justify-between gap-3 rounded-[10px] border border-border-strong bg-panel px-3 py-2.5"
+				>
+					<div class="min-w-0">
+						<div class="truncate text-[12.5px] font-semibold text-ink">{sub.name}</div>
+						<div class="text-[11px] text-muted">
+							Due {sub.next_due_date}{sub.account_name ? ` · ${sub.account_name}` : ''}
+						</div>
+					</div>
+					<div class="flex flex-none items-center gap-2.5">
+						<div class="font-mono text-[13px] font-medium text-ink">
+							{formatPKR(sub.amount)}
+						</div>
+						<form method="POST" action="/subscriptions?/confirmSubscriptionPayment" use:enhance>
+							<input type="hidden" name="id" value={sub.id} />
+							<button
+								type="submit"
+								class="rounded-[9px] border border-accent/40 bg-accent/16 px-2.5 py-1.5 text-[11.5px] font-semibold text-accent-hover transition-colors duration-100 hover:bg-accent/24"
+							>
+								Log payment
+							</button>
+						</form>
+					</div>
+				</div>
+			{/each}
+		</div>
+	</section>
+{/if}
 
 <section class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.32fr)_minmax(0,1fr)]">
 	<CategoryChart categories={categorySpend} {range} onSetRange={(r) => (range = r)} />

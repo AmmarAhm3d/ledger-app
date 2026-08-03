@@ -2,11 +2,13 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Paperclip, Search, Trash2 } from '@lucide/svelte';
+	import { Paperclip, Repeat, Search, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	let linkedIds = $derived(new Set(data.linkedTransactionIds));
 
 	let selectedIds = $state(new Set<number>());
 	let deleting = $state(false);
@@ -66,6 +68,45 @@
 		Math.min(data.pagination.page * data.pagination.limit, data.pagination.totalCount)
 	);
 </script>
+
+{#if data.suggestedTransactions.length > 0}
+	<section class="rounded-[13px] border border-accent/30 bg-accent/6 p-4 sm:p-4.5">
+		<div class="mb-3">
+			<div class="text-[13px] font-semibold tracking-tight text-ink">Suggested transactions</div>
+			<div class="mt-0.5 text-xs text-muted">
+				Subscriptions due — nothing is added to your ledger until you confirm.
+			</div>
+		</div>
+		<div class="flex flex-col gap-2">
+			{#each data.suggestedTransactions as sub (sub.id)}
+				<div
+					class="flex items-center justify-between gap-3 rounded-[10px] border border-border-strong bg-panel px-3 py-2.5"
+				>
+					<div class="min-w-0">
+						<div class="truncate text-[12.5px] font-semibold text-ink">{sub.name}</div>
+						<div class="text-[11px] text-muted">
+							Due {sub.next_due_date}{sub.account_name ? ` · ${sub.account_name}` : ''}
+						</div>
+					</div>
+					<div class="flex flex-none items-center gap-2.5">
+						<div class="font-mono text-[13px] font-medium text-ink">
+							{formatPKR(sub.amount)}
+						</div>
+						<form method="POST" action="/subscriptions?/confirmSubscriptionPayment" use:enhance>
+							<input type="hidden" name="id" value={sub.id} />
+							<button
+								type="submit"
+								class="rounded-[9px] border border-accent/40 bg-accent/16 px-2.5 py-1.5 text-[11.5px] font-semibold text-accent-hover transition-colors duration-100 hover:bg-accent/24"
+							>
+								Log payment
+							</button>
+						</form>
+					</div>
+				</div>
+			{/each}
+		</div>
+	</section>
+{/if}
 
 <section class="rounded-[13px] border border-border bg-panel overflow-hidden">
 	<div class="flex items-center gap-3 border-b border-border px-4 py-3.5 sm:px-4.5 sm:py-4">
@@ -195,6 +236,7 @@
 						class="grid grid-cols-[28px_minmax(0,1.8fr)_1fr_1fr_0.9fr_0.7fr_1fr] items-center gap-3 border-b border-panel-hover px-4.5 py-2 transition-colors duration-100 hover:bg-panel-2"
 					>
 						<input type="hidden" name="id" value={tx.id} />
+						<input type="hidden" name="transaction_id" value={tx.id} />
 						<input
 							type="checkbox"
 							aria-label={`Select ${tx.description ?? 'transaction'}`}
@@ -226,7 +268,7 @@
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 font-mono text-xs text-muted outline-none focus:border-accent focus:bg-panel"
 						/>
-						<div>
+						<div class="flex items-center gap-1.5">
 							{#if tx.has_receipt && tx.receipt_url}
 								<a
 									href={`/api/receipts/${tx.id}`}
@@ -238,6 +280,16 @@
 									<Paperclip size={11} strokeWidth={2} />
 									View
 								</a>
+							{/if}
+							{#if !tx.is_transfer && !linkedIds.has(tx.id)}
+								<button
+									type="submit"
+									formaction="/subscriptions?/createSubscriptionFromTransaction"
+									title="Track as recurring subscription"
+									class="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-accent-hover"
+								>
+									<Repeat size={12} strokeWidth={2} />
+								</button>
 							{/if}
 						</div>
 						<input

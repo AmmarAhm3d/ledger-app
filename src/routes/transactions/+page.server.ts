@@ -1,12 +1,13 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, desc, eq, inArray, isNull, like, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, isNotNull, like, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { accounts, categories, transactions } from '$lib/server/db/schema';
+import { accounts, categories, recurringSubscriptions, transactions } from '$lib/server/db/schema';
 import { parseAmount, parseId } from '$lib/server/form-utils';
 import { logger } from '$lib/server/logger';
 import { logAudit } from '$lib/server/audit';
 import { validate } from '$lib/server/result';
 import { deleteTransactionsSchema, updateTransactionSchema } from '$lib/schema';
+import { getDueSubscriptions } from '$lib/server/subscriptions';
 import type { Actions, PageServerLoad } from './$types';
 
 const DEFAULT_LIMIT = 50;
@@ -63,10 +64,25 @@ export const load: PageServerLoad = async ({ locals, parent, url }) => {
 		.limit(limit)
 		.offset((currentPage - 1) * limit);
 
+	const suggestedTransactions = await getDueSubscriptions(userId);
+
+	const linkedRows = await db
+		.select({ source_transaction_id: recurringSubscriptions.source_transaction_id })
+		.from(recurringSubscriptions)
+		.where(
+			and(
+				eq(recurringSubscriptions.user_id, userId),
+				isNotNull(recurringSubscriptions.source_transaction_id)
+			)
+		);
+	const linkedTransactionIds = new Set(linkedRows.map((row) => row.source_transaction_id));
+
 	return {
 		title: 'Transactions',
 		subtitle: `${totalCount} total`,
 		transactions: transactionRows,
+		suggestedTransactions,
+		linkedTransactionIds: [...linkedTransactionIds],
 		pagination: {
 			page: currentPage,
 			limit,

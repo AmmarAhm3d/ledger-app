@@ -1,0 +1,1 @@
+ALTER TABLE `recurring_subscriptions` ADD `source_transaction_id` integer;

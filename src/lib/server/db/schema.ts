@@ -57,6 +57,9 @@ export const recurringSubscriptions = sqliteTable('recurring_subscriptions', {
 	next_due_date: text('next_due_date').notNull(),
 	is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
 	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+	// The transaction this subscription was created from via "track as subscription",
+	// if any — lets the UI avoid re-prompting for a transaction already tracked.
+	source_transaction_id: integer('source_transaction_id'),
 	...timestamps
 });
 
