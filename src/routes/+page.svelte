@@ -30,8 +30,8 @@
 	let range = $state<30 | 90>(30);
 	let mobileNavOpen = $state(false);
 
-	let accountsOpen = $state(false);
-	let categoriesOpen = $state(false);
+	type ModalKey = 'accounts' | 'categories' | 'addTransaction' | 'pin' | null;
+	let activeModal = $state<ModalKey>(null);
 
 	let transactions = $derived<Transaction[]>(
 		data.transactions.map((tx) => ({
@@ -45,10 +45,7 @@
 	);
 
 	let balanceHidden = $state(true);
-	let pinOpen = $state(false);
 	let pin = $state('');
-
-	let addTransactionOpen = $state(false);
 
 	let accountsTotal = $derived(accounts.reduce((sum, a) => sum + a.balance, 0));
 
@@ -60,7 +57,7 @@
 	function handleToggleBalance() {
 		if (balanceHidden) {
 			pin = '';
-			pinOpen = true;
+			activeModal = 'pin';
 		} else {
 			balanceHidden = true;
 		}
@@ -76,7 +73,7 @@
 		if (next.length === 4) {
 			setTimeout(() => {
 				balanceHidden = false;
-				pinOpen = false;
+				activeModal = null;
 				pin = '';
 			}, 180);
 		}
@@ -90,8 +87,8 @@
 		accountCount={accounts.length}
 		categoryCount={categories.length}
 		onNav={(key) => (nav = key)}
-		onManageAccounts={() => (accountsOpen = true)}
-		onManageCategories={() => (categoriesOpen = true)}
+		onManageAccounts={() => (activeModal = 'accounts')}
+		onManageCategories={() => (activeModal = 'categories')}
 		onSignOut={handleSignOut}
 		open={mobileNavOpen}
 		onClose={() => (mobileNavOpen = false)}
@@ -101,7 +98,7 @@
 		<DashboardHeader
 			title="Overview"
 			subtitle="February 2026 · synced 4 minutes ago"
-			onAddTransaction={() => (addTransactionOpen = true)}
+			onAddTransaction={() => (activeModal = 'addTransaction')}
 			onToggleNav={() => (mobileNavOpen = true)}
 		/>
 
@@ -131,25 +128,30 @@
 </div>
 
 <AccountsModal
-	open={accountsOpen}
+	open={activeModal === 'accounts'}
 	{accounts}
-	onClose={() => (accountsOpen = false)}
+	onClose={() => (activeModal = null)}
 	errorMessage={form?.message}
 />
 
 <CategoriesModal
-	open={categoriesOpen}
+	open={activeModal === 'categories'}
 	{categories}
-	onClose={() => (categoriesOpen = false)}
+	onClose={() => (activeModal = null)}
 	errorMessage={form?.message}
 />
 
-<PinModal open={pinOpen} {pin} onPressKey={handlePressKey} onClose={() => (pinOpen = false)} />
+<PinModal
+	open={activeModal === 'pin'}
+	{pin}
+	onPressKey={handlePressKey}
+	onClose={() => (activeModal = null)}
+/>
 
 <AddTransactionModal
-	open={addTransactionOpen}
+	open={activeModal === 'addTransaction'}
 	{accounts}
 	{categories}
-	onClose={() => (addTransactionOpen = false)}
+	onClose={() => (activeModal = null)}
 	errorMessage={form?.message}
 />
