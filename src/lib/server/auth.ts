@@ -26,5 +26,12 @@ export const auth = betterAuth({
 			clientId: GITHUB_CLIENT_ID,
 			clientSecret: GITHUB_CLIENT_SECRET
 		}
+	},
+	// Sign-in only (disableSignUp: true) — this exists solely so the preview-only login
+	// route (src/routes/api/preview-login) can authenticate a single seeded throwaway
+	// account without a GitHub OAuth round-trip. No public sign-up endpoint is exposed.
+	emailAndPassword: {
+		enabled: true,
+		disableSignUp: true
 	}
 });

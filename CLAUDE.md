@@ -36,6 +36,8 @@ Required: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` (scoped to Development/Previe
 
 Vercel Blob auth note: the SDK does not auto-read env vars in Vite/SvelteKit (only in Next.js) — `oidcToken`/`storeId` must be passed explicitly to `put`/`get`/`list`/`del` calls, sourced from `$env/static/private`.
 
+Preview-only login route (`src/routes/api/preview-login`, see #37): lets automation/visual verification sign in without a GitHub OAuth round-trip, by authenticating a single throwaway seeded user (`preview-test@ledger.local`, own isolated accounts/categories, no real data) via Better Auth's email/password provider. Requires `PREVIEW_LOGIN_SECRET`, `PREVIEW_TEST_USER_EMAIL`, `PREVIEW_TEST_USER_PASSWORD` set on Vercel, scoped to **Preview only** — the route hard-rejects when `VERCEL_ENV === 'production'` regardless of the secret. `emailAndPassword` is enabled in `src/lib/server/auth.ts` for sign-in only (`disableSignUp: true`); no public sign-up endpoint is exposed in any environment.
+
 ## Architecture
 
 **Current state**: the UI (`src/routes/+page.svelte` and `src/lib/components/*`) is fully built but still runs on static mock data from `src/lib/data.ts` / `src/lib/types.ts`, held in page-level `$state`. The Drizzle/Turso layer (`src/lib/server/db/`) exists but nothing in `src/routes` reads from it yet — wiring real data through `load` functions / form actions is the next major piece of work.
