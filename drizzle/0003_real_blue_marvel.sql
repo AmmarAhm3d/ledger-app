@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS `storage_usage` (
+CREATE TABLE `storage_usage` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`total_bytes` integer DEFAULT 0 NOT NULL,
 	`blob_count` integer DEFAULT 0 NOT NULL,
