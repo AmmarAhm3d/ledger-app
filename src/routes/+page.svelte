@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { authClient } from '$lib/auth-client';
+	import { getStoredPin, setStoredPin, clearStoredPin } from '$lib/pin-storage';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import DashboardHeader from '$lib/components/DashboardHeader.svelte';
 	import KPICards from '$lib/components/KPICards.svelte';
@@ -46,6 +48,9 @@
 
 	let balanceHidden = $state(true);
 	let pin = $state('');
+	let pinStage = $state<'create' | 'confirm' | 'unlock'>('unlock');
+	let pinPending = $state('');
+	let pinError = $state(false);
 
 	let accountsTotal = $derived(accounts.reduce((sum, a) => sum + a.balance, 0));
 
@@ -57,25 +62,70 @@
 	function handleToggleBalance() {
 		if (balanceHidden) {
 			pin = '';
+			pinPending = '';
+			pinError = false;
+			pinStage = browser && getStoredPin() ? 'unlock' : 'create';
 			activeModal = 'pin';
 		} else {
 			balanceHidden = true;
 		}
 	}
 
+	function unlockBalance() {
+		balanceHidden = false;
+		activeModal = null;
+		pin = '';
+		pinPending = '';
+		pinError = false;
+	}
+
+	function handlePinReset() {
+		clearStoredPin();
+		pin = '';
+		pinPending = '';
+		pinError = false;
+		pinStage = 'create';
+	}
+
 	function handlePressKey(key: string) {
 		if (key === '⌫') {
 			pin = pin.slice(0, -1);
+			pinError = false;
 			return;
 		}
+		pinError = false;
 		const next = (pin + key).slice(0, 4);
 		pin = next;
-		if (next.length === 4) {
-			setTimeout(() => {
-				balanceHidden = false;
-				activeModal = null;
+		if (next.length < 4) return;
+
+		if (pinStage === 'create') {
+			pinPending = next;
+			pin = '';
+			pinStage = 'confirm';
+			return;
+		}
+
+		if (pinStage === 'confirm') {
+			if (next === pinPending) {
+				setStoredPin(next);
+				setTimeout(unlockBalance, 180);
+			} else {
+				pinError = true;
 				pin = '';
-			}, 180);
+				pinPending = '';
+				pinStage = 'create';
+			}
+			return;
+		}
+
+		if (next === getStoredPin()) {
+			setTimeout(unlockBalance, 180);
+		} else {
+			pinError = true;
+			setTimeout(() => {
+				pin = '';
+				pinError = false;
+			}, 400);
 		}
 	}
 
@@ -144,8 +194,11 @@
 <PinModal
 	open={activeModal === 'pin'}
 	{pin}
+	mode={pinStage}
+	error={pinError}
 	onPressKey={handlePressKey}
 	onClose={() => (activeModal = null)}
+	onReset={handlePinReset}
 />
 
 <AddTransactionModal
