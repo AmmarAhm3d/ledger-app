@@ -15,9 +15,22 @@
 	function dotFilled(index: number) {
 		return pin.length > index;
 	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (!open) return;
+		if (e.key === 'Escape') {
+			onClose();
+		} else if (e.key === 'Backspace') {
+			e.preventDefault();
+			onPressKey('⌫');
+		} else if (/^[0-9]$/.test(e.key)) {
+			e.preventDefault();
+			onPressKey(e.key);
+		}
+	}
 </script>
 
-<svelte:window onkeydown={(e) => open && e.key === 'Escape' && onClose()} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if open}
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
