@@ -44,6 +44,30 @@ export const transactions = sqliteTable('transactions', {
 	...timestamps
 });
 
+export const recurringSubscriptions = sqliteTable('recurring_subscriptions', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	name: text('name').notNull(),
+	amount: real('amount').notNull(),
+	cadence: text('cadence', { enum: ['weekly', 'monthly', 'yearly'] }).notNull().default('monthly'),
+	category_id: integer('category_id').references(() => categories.id),
+	account_id: integer('account_id').references(() => accounts.id),
+	next_due_date: text('next_due_date').notNull(),
+	is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+	...timestamps
+});
+
+export const savingsGoals = sqliteTable('savings_goals', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	name: text('name').notNull(),
+	target_amount: real('target_amount').notNull(),
+	current_amount: real('current_amount').notNull().default(0),
+	target_date: text('target_date'),
+	account_id: integer('account_id').references(() => accounts.id),
+	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+	...timestamps
+});
+
 // Better Auth core schema (https://better-auth.com/docs/concepts/database#core-schema).
 // Property names below are dictated by Better Auth's internal model (camelCase) and must
 // not be renamed; only the underlying column names follow this repo's snake_case convention.
