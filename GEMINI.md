@@ -53,6 +53,27 @@ Both `drizzle.config.ts` and `src/lib/server/db/index.ts` throw immediately if T
 
 > **Note on Vercel Blob auth**: In Vite/SvelteKit, the Vercel Blob SDK does not auto-detect environment variables. Pass `oidcToken` and `storeId` explicitly to `put` calls sourced from `$env/dynamic/private`.
 
+### Preview-only login route
+
+`src/routes/api/preview-login` (see issue #37) lets automation/visual verification sign in without a GitHub OAuth round-trip, by authenticating one throwaway seeded user (`preview-test@ledger.local`, its own isolated accounts/categories, no real data) via Better Auth's email/password provider. Needs `PREVIEW_LOGIN_SECRET`, `PREVIEW_TEST_USER_EMAIL`, `PREVIEW_TEST_USER_PASSWORD` set on Vercel, scoped to **Preview only** — the route hard-rejects when `VERCEL_ENV === 'production'` regardless of the secret. `emailAndPassword` is enabled in `src/lib/server/auth.ts` for sign-in only (`disableSignUp: true`); no public sign-up endpoint exists in any environment.
+
+### Visually verifying a PR against a Vercel Preview deployment
+
+Two gates stand between you and a usable Preview session:
+
+1. **Vercel Deployment Protection** (the SSO screen) — gates reaching the deployment at all, unrelated to app login.
+2. **This app's GitHub OAuth** — gates the dashboard once past #1.
+
+#1 is already satisfied if the browser session used has an active Vercel SSO login (true for a real Chrome profile that's signed into Vercel). #2 is cleared by the preview-login route. Flow:
+
+1. Find the branch's stable Preview URL (constant across rebuilds): `ledger-app-git-<branch-name>-ammars-projects-3b535e02.vercel.app`, or pull it from the Vercel bot's PR comment.
+2. Open `<preview-url>/api/preview-login?secret=<PREVIEW_LOGIN_SECRET>` in a browser context that already carries a Vercel SSO session — a sandboxed/headless browser with no cookies won't clear gate #1.
+3. It redirects to `/`, signed in as the throwaway preview user — interact and screenshot normally from there.
+
+For API-only checks with no visual need, `vercel curl <url>` authenticates past gate #1 via the Vercel CLI identity, no browser required. Don't build a custom bypass for gate #1 — Vercel already provides one.
+
+**Env var changes require a new deployment to take effect** — Vercel injects vars into a deployment's runtime at deploy time, not per-request, so adding one in the dashboard does nothing until the next deploy (a trivial commit is enough to trigger one).
+
 ---
 
 ## Architecture
