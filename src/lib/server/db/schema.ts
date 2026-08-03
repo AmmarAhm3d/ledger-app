@@ -17,6 +17,7 @@ export const accounts = sqliteTable('accounts', {
 	type: text('type').notNull(),
 	balance: real('balance').notNull().default(0),
 	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+	deleted_at: text('deleted_at'),
 	...timestamps
 });
 
@@ -25,6 +26,7 @@ export const categories = sqliteTable('categories', {
 	name: text('name').notNull(),
 	monthly_cap: real('monthly_cap').notNull().default(0),
 	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+	deleted_at: text('deleted_at'),
 	...timestamps
 });
 
@@ -41,7 +43,25 @@ export const transactions = sqliteTable('transactions', {
 	has_receipt: integer('has_receipt', { mode: 'boolean' }).notNull().default(false),
 	receipt_url: text('receipt_url'),
 	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+	deleted_at: text('deleted_at'),
 	...timestamps
+});
+
+// Audit trail for insert/update/delete (including soft-delete) mutations on financial records.
+// old_values/new_values store JSON-serialized snapshots of the affected row; entity_type/action
+// are free-form strings kept consistent by convention (e.g. 'account'/'category'/'transaction',
+// 'create'/'update'/'delete').
+export const auditLogs = sqliteTable('audit_logs', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+	entity_type: text('entity_type').notNull(),
+	entity_id: integer('entity_id').notNull(),
+	action: text('action').notNull(),
+	old_values: text('old_values'),
+	new_values: text('new_values'),
+	created_at: text('created_at')
+		.notNull()
+		.default(sql`(current_timestamp)`)
 });
 
 // Better Auth core schema (https://better-auth.com/docs/concepts/database#core-schema).

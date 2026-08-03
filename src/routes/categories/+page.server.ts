@@ -1,8 +1,9 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { categories } from '$lib/server/db/schema';
 import { parseId, parseOptionalAmount } from '$lib/server/form-utils';
+import { logAudit } from '$lib/server/audit';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
@@ -21,7 +22,20 @@ export const actions: Actions = {
 		if (!name) return fail(400, { message: 'Category name is required' });
 		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
 
-		await db.insert(categories).values({ name, monthly_cap: monthlyCap, user_id: locals.user.id });
+		await db.transaction(async (tx) => {
+			const [created] = await tx
+				.insert(categories)
+				.values({ name, monthly_cap: monthlyCap, user_id: locals.user!.id })
+				.returning();
+
+			await logAudit(tx, {
+				userId: locals.user!.id,
+				entityType: 'category',
+				entityId: created.id,
+				action: 'create',
+				newValues: created
+			});
+		});
 	},
 
 	updateCategory: async ({ request, locals }) => {
@@ -35,10 +49,34 @@ export const actions: Actions = {
 		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
 		if (!name) return fail(400, { message: 'Category name is required' });
 
-		await db
-			.update(categories)
-			.set({ name, monthly_cap: monthlyCap })
-			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
+		await db.transaction(async (tx) => {
+			const [existing] = await tx
+				.select()
+				.from(categories)
+				.where(
+					and(
+						eq(categories.id, id),
+						eq(categories.user_id, locals.user!.id),
+						isNull(categories.deleted_at)
+					)
+				);
+			if (!existing) return;
+
+			const [updated] = await tx
+				.update(categories)
+				.set({ name, monthly_cap: monthlyCap })
+				.where(and(eq(categories.id, id), eq(categories.user_id, locals.user!.id)))
+				.returning();
+
+			await logAudit(tx, {
+				userId: locals.user!.id,
+				entityType: 'category',
+				entityId: id,
+				action: 'update',
+				oldValues: existing,
+				newValues: updated
+			});
+		});
 	},
 
 	removeCategory: async ({ request, locals }) => {
@@ -47,8 +85,31 @@ export const actions: Actions = {
 		const id = parseId(form.get('id'));
 		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
 
-		await db
-			.delete(categories)
-			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
+		await db.transaction(async (tx) => {
+			const [existing] = await tx
+				.select()
+				.from(categories)
+				.where(
+					and(
+						eq(categories.id, id),
+						eq(categories.user_id, locals.user!.id),
+						isNull(categories.deleted_at)
+					)
+				);
+			if (!existing) return;
+
+			await tx
+				.update(categories)
+				.set({ deleted_at: sql`(current_timestamp)` })
+				.where(and(eq(categories.id, id), eq(categories.user_id, locals.user!.id)));
+
+			await logAudit(tx, {
+				userId: locals.user!.id,
+				entityType: 'category',
+				entityId: id,
+				action: 'delete',
+				oldValues: existing
+			});
+		});
 	}
 };

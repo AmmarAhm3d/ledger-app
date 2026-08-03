@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { get } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
@@ -16,7 +16,13 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	const [tx] = await db
 		.select({ receiptUrl: transactions.receipt_url })
 		.from(transactions)
-		.where(and(eq(transactions.id, id), eq(transactions.user_id, locals.user.id)));
+		.where(
+			and(
+				eq(transactions.id, id),
+				eq(transactions.user_id, locals.user.id),
+				isNull(transactions.deleted_at)
+			)
+		);
 
 	if (!tx?.receiptUrl) throw error(404, 'Not found');
 
