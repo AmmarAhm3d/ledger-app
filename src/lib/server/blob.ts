@@ -11,31 +11,38 @@ export interface BlobInfo {
 }
 
 export async function listAllBlobs(): Promise<BlobInfo[]> {
-	const blobs: BlobInfo[] = [];
-	let cursor: string | undefined = undefined;
-	let hasMore = true;
+	const blobMap = new Map<string, BlobInfo>();
+	const prefixes = ['receipts/', ''];
 
-	while (hasMore) {
-		const options: { cursor?: string; oidcToken?: string; storeId?: string } = {
-			oidcToken: env.VERCEL_OIDC_TOKEN,
-			storeId: env.BLOB_STORE_ID
-		};
-		if (cursor) {
-			options.cursor = cursor;
+	for (const prefix of prefixes) {
+		let cursor: string | undefined = undefined;
+		let hasMore = true;
+
+		while (hasMore) {
+			const options: { prefix?: string; cursor?: string; oidcToken?: string; storeId?: string } = {
+				oidcToken: env.VERCEL_OIDC_TOKEN,
+				storeId: env.BLOB_STORE_ID
+			};
+			if (prefix) {
+				options.prefix = prefix;
+			}
+			if (cursor) {
+				options.cursor = cursor;
+			}
+			const res = await list(options);
+			for (const item of res.blobs) {
+				blobMap.set(item.url, {
+					url: item.url,
+					size: item.size,
+					uploadedAt: item.uploadedAt
+				});
+			}
+			hasMore = res.hasMore;
+			cursor = res.cursor;
 		}
-		const res = await list(options);
-		for (const item of res.blobs) {
-			blobs.push({
-				url: item.url,
-				size: item.size,
-				uploadedAt: item.uploadedAt
-			});
-		}
-		hasMore = res.hasMore;
-		cursor = res.cursor;
 	}
 
-	return blobs;
+	return Array.from(blobMap.values());
 }
 
 export async function getBlobStorageUsage() {
