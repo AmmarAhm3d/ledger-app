@@ -4,6 +4,8 @@
 		ArrowLeftRight,
 		Tag,
 		Receipt,
+		Repeat,
+		PiggyBank,
 		Settings,
 		CreditCard,
 		LogOut,
@@ -28,6 +30,8 @@
 		{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
 		{ href: '/categories', label: 'Categories', icon: Tag },
 		{ href: '/receipts', label: 'Receipts', icon: Receipt },
+		{ href: '/subscriptions', label: 'Subscriptions', icon: Repeat },
+		{ href: '/goals', label: 'Goals', icon: PiggyBank },
 		{ href: '/settings', label: 'Settings', icon: Settings }
 	];
 
