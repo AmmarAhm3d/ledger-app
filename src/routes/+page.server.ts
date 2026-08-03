@@ -12,11 +12,13 @@ import {
 	addAccountSchema,
 	addTransactionSchema,
 	ALLOWED_RECEIPT_TYPES,
+	bulkImportYamlSchema,
 	receiptFileSchema,
 	removeAccountSchema,
 	transferSchema,
 	updateAccountBalanceSchema
 } from '$lib/schema';
+import { parseAndValidateBulkImport } from '$lib/bulk-import';
 import { getDueSubscriptions } from '$lib/server/subscriptions';
 import type { CategorySpend } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
@@ -514,6 +516,95 @@ export const actions: Actions = {
 			logger.info('Transfer completed', { userId, fromAccountId, toAccountId });
 		} catch (error) {
 			logger.error('Failed to complete transfer', { userId, fromAccountId, toAccountId, error });
+			throw error;
+		}
+	},
+
+	bulkImportTransactions: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const userId = locals.user.id;
+		const form = await request.formData();
+
+		const result = validate(bulkImportYamlSchema, {
+			yaml: form.get('yaml')?.toString() ?? ''
+		});
+		if (!result.success) {
+			logger.warn('bulkImportTransactions validation failed', { userId, error: result.error });
+			return fail(400, { message: result.error });
+		}
+
+		const [userAccounts, userCategories] = await Promise.all([
+			db
+				.select({ id: accounts.id, name: accounts.name })
+				.from(accounts)
+				.where(and(eq(accounts.user_id, userId), isNull(accounts.deleted_at))),
+			db
+				.select({ id: categories.id, name: categories.name })
+				.from(categories)
+				.where(and(eq(categories.user_id, userId), isNull(categories.deleted_at)))
+		]);
+
+		const { entries, errors } = parseAndValidateBulkImport(
+			result.data.yaml,
+			userAccounts,
+			userCategories
+		);
+		if (errors.length > 0) {
+			logger.warn('bulkImportTransactions rejected invalid entries', {
+				userId,
+				errorCount: errors.length
+			});
+			return fail(400, {
+				message: `${errors.length} line${errors.length === 1 ? '' : 's'} failed validation — nothing was imported`,
+				errors
+			});
+		}
+		if (entries.length === 0) {
+			return fail(400, { message: 'No transactions found to import' });
+		}
+
+		try {
+			await db.transaction(async (tx) => {
+				const balanceDeltas = new Map<number, number>();
+				const values = entries.map((entry) => {
+					const signedAmount =
+						entry.type === 'income' ? Math.abs(entry.amount) : -Math.abs(entry.amount);
+					balanceDeltas.set(
+						entry.account_id,
+						(balanceDeltas.get(entry.account_id) ?? 0) + signedAmount
+					);
+					return {
+						amount: signedAmount,
+						description: entry.note ? `${entry.description} — ${entry.note}` : entry.description,
+						account_id: entry.account_id,
+						category_id: entry.category_id,
+						date: entry.date,
+						user_id: userId
+					};
+				});
+
+				const created = await tx.insert(transactions).values(values).returning();
+
+				for (const [accountId, delta] of balanceDeltas) {
+					await tx
+						.update(accounts)
+						.set({ balance: sql`${accounts.balance} + ${delta}` })
+						.where(eq(accounts.id, accountId));
+				}
+
+				for (const row of created) {
+					await logAudit(tx, {
+						userId,
+						entityType: 'transaction',
+						entityId: row.id,
+						action: 'create',
+						newValues: row
+					});
+				}
+			});
+			logger.info('Bulk import completed', { userId, count: entries.length });
+		} catch (error) {
+			logger.error('Failed to bulk import transactions', { userId, error });
 			throw error;
 		}
 	}

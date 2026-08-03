@@ -109,7 +109,8 @@ export const actions: Actions = {
 			description: form.get('description'),
 			amount: parseAmount(form.get('amount')),
 			date: form.get('date')?.toString() ?? '',
-			category_id: parseId(form.get('category_id'))
+			category_id: parseId(form.get('category_id')),
+			account_id: parseId(form.get('account_id'))
 		});
 		if (!result.success) {
 			logger.warn('updateTransaction validation failed', {
@@ -118,7 +119,8 @@ export const actions: Actions = {
 			});
 			return fail(400, { message: result.error });
 		}
-		const { id, description, amount, date, category_id: categoryId } = result.data;
+		const { id, description, amount, date, category_id: categoryId, account_id: accountId } =
+			result.data;
 
 		const [ownedCategory] = await db
 			.select({ id: categories.id })
@@ -131,6 +133,18 @@ export const actions: Actions = {
 				)
 			);
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
+
+		const [ownedAccount] = await db
+			.select({ id: accounts.id })
+			.from(accounts)
+			.where(
+				and(
+					eq(accounts.id, accountId),
+					eq(accounts.user_id, locals.user.id),
+					isNull(accounts.deleted_at)
+				)
+			);
+		if (!ownedAccount) return fail(400, { message: 'Invalid account' });
 
 		const [existing] = await db
 			.select()
@@ -145,13 +159,11 @@ export const actions: Actions = {
 			);
 		if (!existing) return fail(400, { message: 'Invalid transaction' });
 
-		const delta = amount - existing.amount;
-
 		try {
 			await db.transaction(async (tx) => {
 				const [updated] = await tx
 					.update(transactions)
-					.set({ description, amount, date, category_id: categoryId })
+					.set({ description, amount, date, category_id: categoryId, account_id: accountId })
 					.where(
 						and(
 							eq(transactions.id, id),
@@ -161,11 +173,23 @@ export const actions: Actions = {
 					)
 					.returning();
 
-				if (delta !== 0) {
+				if (existing.account_id === accountId) {
+					const delta = amount - existing.amount;
+					if (delta !== 0) {
+						await tx
+							.update(accounts)
+							.set({ balance: sql`${accounts.balance} + ${delta}` })
+							.where(eq(accounts.id, accountId));
+					}
+				} else {
 					await tx
 						.update(accounts)
-						.set({ balance: sql`${accounts.balance} + ${delta}` })
+						.set({ balance: sql`${accounts.balance} - ${existing.amount}` })
 						.where(eq(accounts.id, existing.account_id));
+					await tx
+						.update(accounts)
+						.set({ balance: sql`${accounts.balance} + ${amount}` })
+						.where(eq(accounts.id, accountId));
 				}
 
 				await logAudit(tx, {

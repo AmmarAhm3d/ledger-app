@@ -91,7 +91,8 @@ export const updateTransactionSchema = z.object({
 	description: optionalDescription,
 	amount: finiteNumber('Amount must be a number'),
 	date: requiredText('Date is required'),
-	category_id: positiveIntId('Invalid category')
+	category_id: positiveIntId('Invalid category'),
+	account_id: positiveIntId('Invalid account')
 });
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 
@@ -116,6 +117,13 @@ export const transferSchema = z
 		path: ['to_account_id']
 	});
 export type TransferInput = z.infer<typeof transferSchema>;
+
+// ---- Bulk YAML import ----
+
+export const bulkImportYamlSchema = z.object({
+	yaml: requiredText('Paste transactions to import')
+});
+export type BulkImportYamlInput = z.infer<typeof bulkImportYamlSchema>;
 
 // ---- Receipts (file uploads on the addTransaction action) ----
 
