@@ -117,6 +117,13 @@ export const transferSchema = z
 	});
 export type TransferInput = z.infer<typeof transferSchema>;
 
+// ---- Bulk YAML import ----
+
+export const bulkImportYamlSchema = z.object({
+	yaml: requiredText('Paste transactions to import')
+});
+export type BulkImportYamlInput = z.infer<typeof bulkImportYamlSchema>;
+
 // ---- Receipts (file uploads on the addTransaction action) ----
 
 export const ALLOWED_RECEIPT_TYPES: Record<string, string> = {

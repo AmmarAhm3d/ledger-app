@@ -8,6 +8,7 @@
 	import AccountsModal from '$lib/components/AccountsModal.svelte';
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
 	import TransferModal from '$lib/components/TransferModal.svelte';
+	import BulkImportModal from '$lib/components/BulkImportModal.svelte';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 
@@ -15,7 +16,7 @@
 
 	let mobileNavOpen = $state(false);
 
-	type ModalKey = 'accounts' | 'addTransaction' | 'transfer' | null;
+	type ModalKey = 'accounts' | 'addTransaction' | 'transfer' | 'bulkImport' | null;
 	let activeModal = $state<ModalKey>(null);
 
 	async function handleSignOut() {
@@ -41,6 +42,7 @@
 				subtitle={(page.data.subtitle as string | undefined) ?? ''}
 				onAddTransaction={() => (activeModal = 'addTransaction')}
 				onTransfer={() => (activeModal = 'transfer')}
+				onBulkImport={() => (activeModal = 'bulkImport')}
 				onToggleNav={() => (mobileNavOpen = true)}
 			/>
 
@@ -68,6 +70,13 @@
 	<TransferModal
 		open={activeModal === 'transfer'}
 		accounts={data.accounts}
+		onClose={() => (activeModal = null)}
+	/>
+
+	<BulkImportModal
+		open={activeModal === 'bulkImport'}
+		accounts={data.accounts}
+		categories={data.categories}
 		onClose={() => (activeModal = null)}
 	/>
 {:else}
