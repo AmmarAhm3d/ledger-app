@@ -174,6 +174,7 @@ export const actions: Actions = {
 
 	addTransaction: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const userId = locals.user.id;
 		const formData = await request.formData();
 
 		const amount = parseAmount(formData.get('amount'));
@@ -202,13 +203,13 @@ export const actions: Actions = {
 		const [ownedAccount] = await db
 			.select({ id: accounts.id })
 			.from(accounts)
-			.where(and(eq(accounts.id, accountId), eq(accounts.user_id, locals.user.id)));
+			.where(and(eq(accounts.id, accountId), eq(accounts.user_id, userId)));
 		if (!ownedAccount) return fail(400, { message: 'Invalid account' });
 
 		const [ownedCategory] = await db
 			.select({ id: categories.id })
 			.from(categories)
-			.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
+			.where(and(eq(categories.id, categoryId), eq(categories.user_id, userId)));
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
 		let receiptUrl: string | null = null;
@@ -231,15 +232,22 @@ export const actions: Actions = {
 			receiptUrl = blob.url;
 		}
 
-		await db.insert(transactions).values({
-			amount: signedAmount,
-			description,
-			account_id: accountId,
-			category_id: categoryId,
-			date,
-			has_receipt: receiptUrl !== null,
-			receipt_url: receiptUrl,
-			user_id: locals.user.id
+		await db.transaction(async (tx) => {
+			await tx.insert(transactions).values({
+				amount: signedAmount,
+				description,
+				account_id: accountId,
+				category_id: categoryId,
+				date,
+				has_receipt: receiptUrl !== null,
+				receipt_url: receiptUrl,
+				user_id: userId
+			});
+
+			await tx
+				.update(accounts)
+				.set({ balance: sql`${accounts.balance} + ${signedAmount}` })
+				.where(eq(accounts.id, accountId));
 		});
 	},
 
