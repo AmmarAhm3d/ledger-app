@@ -15,6 +15,13 @@
       "when": 1785684182287,
       "tag": "0001_even_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785748573770,
+      "tag": "0002_transfer_support",
+      "breakpoints": true
     }
   ]
 }

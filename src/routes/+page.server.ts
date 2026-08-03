@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { put } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
@@ -58,6 +58,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				description: transactions.description,
 				account_id: transactions.account_id,
 				category_id: transactions.category_id,
+				is_transfer: transactions.is_transfer,
 				has_receipt: transactions.has_receipt,
 				receipt_url: transactions.receipt_url,
 				account_name: accounts.name,
@@ -65,7 +66,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			})
 			.from(transactions)
 			.innerJoin(accounts, eq(transactions.account_id, accounts.id))
-			.innerJoin(categories, eq(transactions.category_id, categories.id))
+			.leftJoin(categories, eq(transactions.category_id, categories.id))
 			.where(eq(transactions.user_id, userId))
 			.orderBy(desc(transactions.date), desc(transactions.id))
 	]);
@@ -88,6 +89,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const weeklySpend = [0, 0, 0, 0];
 
 	for (const tx of transactionRows) {
+		if (tx.is_transfer) continue;
+
 		if (tx.amount < 0) {
 			const daysAgo = Math.floor((today.getTime() - new Date(tx.date).getTime()) / DAY_MS);
 			if (daysAgo >= 0 && daysAgo < 28) {
@@ -107,7 +110,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		if (tx.amount > 0) {
 			monthlyIncome += tx.amount;
-		} else if (tx.amount < 0) {
+		} else if (tx.amount < 0 && tx.category_id != null && tx.category_name != null) {
 			const spend = Math.abs(tx.amount);
 			monthlyExpenses += spend;
 			const existing = categoryTotals.get(tx.category_id);
@@ -312,6 +315,76 @@ export const actions: Actions = {
 			has_receipt: receiptUrl !== null,
 			receipt_url: receiptUrl,
 			user_id: locals.user.id
+		});
+	},
+
+	transfer: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const userId = locals.user.id;
+		const form = await request.formData();
+
+		const fromAccountId = parseId(form.get('from_account_id'));
+		const toAccountId = parseId(form.get('to_account_id'));
+		const amount = parseAmount(form.get('amount'));
+		const description = form.get('description')?.toString().trim() || null;
+		const date = form.get('date')?.toString();
+
+		if (Number.isNaN(fromAccountId) || Number.isNaN(toAccountId) || !date) {
+			return fail(400, { message: 'Missing required fields' });
+		}
+		if (fromAccountId === toAccountId) {
+			return fail(400, { message: 'Choose two different accounts' });
+		}
+		if (!Number.isFinite(amount) || amount <= 0) {
+			return fail(400, { message: 'Amount must be a positive number' });
+		}
+
+		const [fromAccount, toAccount] = await Promise.all([
+			db
+				.select({ id: accounts.id, name: accounts.name })
+				.from(accounts)
+				.where(and(eq(accounts.id, fromAccountId), eq(accounts.user_id, userId)))
+				.then((rows) => rows[0]),
+			db
+				.select({ id: accounts.id, name: accounts.name })
+				.from(accounts)
+				.where(and(eq(accounts.id, toAccountId), eq(accounts.user_id, userId)))
+				.then((rows) => rows[0])
+		]);
+		if (!fromAccount) return fail(400, { message: 'Invalid source account' });
+		if (!toAccount) return fail(400, { message: 'Invalid destination account' });
+
+		await db.transaction(async (tx) => {
+			await tx
+				.update(accounts)
+				.set({ balance: sql`${accounts.balance} - ${amount}` })
+				.where(eq(accounts.id, fromAccountId));
+
+			await tx
+				.update(accounts)
+				.set({ balance: sql`${accounts.balance} + ${amount}` })
+				.where(eq(accounts.id, toAccountId));
+
+			await tx.insert(transactions).values([
+				{
+					amount: -Math.abs(amount),
+					description: description ?? `Transfer to ${toAccount.name}`,
+					account_id: fromAccountId,
+					category_id: null,
+					is_transfer: true,
+					date,
+					user_id: userId
+				},
+				{
+					amount: Math.abs(amount),
+					description: description ?? `Transfer from ${fromAccount.name}`,
+					account_id: toAccountId,
+					category_id: null,
+					is_transfer: true,
+					date,
+					user_id: userId
+				}
+			]);
 		});
 	}
 };
