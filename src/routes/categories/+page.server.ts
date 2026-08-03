@@ -3,6 +3,9 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { categories } from '$lib/server/db/schema';
 import { parseId, parseOptionalAmount } from '$lib/server/form-utils';
+import { logger } from '$lib/server/logger';
+import { validate } from '$lib/server/result';
+import { addCategorySchema, removeCategorySchema, updateCategorySchema } from '$lib/schema';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
@@ -15,40 +18,80 @@ export const actions: Actions = {
 	addCategory: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const name = String(form.get('name') ?? '').trim();
-		const monthlyCap = parseOptionalAmount(form.get('monthly_cap'));
 
-		if (!name) return fail(400, { message: 'Category name is required' });
-		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
+		const result = validate(addCategorySchema, {
+			name: form.get('name')?.toString() ?? '',
+			monthly_cap: parseOptionalAmount(form.get('monthly_cap'))
+		});
+		if (!result.success) {
+			logger.warn('addCategory validation failed', { userId: locals.user.id, error: result.error });
+			return fail(400, { message: result.error });
+		}
+		const { name, monthly_cap: monthlyCap } = result.data;
 
-		await db.insert(categories).values({ name, monthly_cap: monthlyCap, user_id: locals.user.id });
+		try {
+			await db
+				.insert(categories)
+				.values({ name, monthly_cap: monthlyCap, user_id: locals.user.id });
+			logger.info('Category created', { userId: locals.user.id, name });
+		} catch (error) {
+			logger.error('Failed to insert category', { userId: locals.user.id, error });
+			throw error;
+		}
 	},
 
 	updateCategory: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		const name = String(form.get('name') ?? '').trim();
-		const monthlyCap = parseOptionalAmount(form.get('monthly_cap'));
 
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
-		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
-		if (!name) return fail(400, { message: 'Category name is required' });
+		const result = validate(updateCategorySchema, {
+			id: parseId(form.get('id')),
+			name: form.get('name')?.toString() ?? '',
+			monthly_cap: parseOptionalAmount(form.get('monthly_cap'))
+		});
+		if (!result.success) {
+			logger.warn('updateCategory validation failed', {
+				userId: locals.user.id,
+				error: result.error
+			});
+			return fail(400, { message: result.error });
+		}
+		const { id, name, monthly_cap: monthlyCap } = result.data;
 
-		await db
-			.update(categories)
-			.set({ name, monthly_cap: monthlyCap })
-			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
+		try {
+			await db
+				.update(categories)
+				.set({ name, monthly_cap: monthlyCap })
+				.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
+			logger.info('Category updated', { userId: locals.user.id, categoryId: id });
+		} catch (error) {
+			logger.error('Failed to update category', { userId: locals.user.id, categoryId: id, error });
+			throw error;
+		}
 	},
 
 	removeCategory: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
 
-		await db
-			.delete(categories)
-			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
+		const result = validate(removeCategorySchema, { id: parseId(form.get('id')) });
+		if (!result.success) {
+			logger.warn('removeCategory validation failed', {
+				userId: locals.user.id,
+				error: result.error
+			});
+			return fail(400, { message: result.error });
+		}
+		const { id } = result.data;
+
+		try {
+			await db
+				.delete(categories)
+				.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
+			logger.info('Category removed', { userId: locals.user.id, categoryId: id });
+		} catch (error) {
+			logger.error('Failed to delete category', { userId: locals.user.id, categoryId: id, error });
+			throw error;
+		}
 	}
 };
