@@ -1,7 +1,7 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { auth } from '$lib/server/auth';
 
-const PUBLIC_PATHS = ['/login', '/api/auth', '/api/preview-login'];
+const PUBLIC_PATHS = ['/login', '/api/auth', '/api/preview-login', '/api/cron'];
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const session = await auth.api.getSession({ headers: event.request.headers });
