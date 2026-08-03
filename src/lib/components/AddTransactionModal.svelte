@@ -17,6 +17,7 @@
 	let fileInputEl = $state<HTMLInputElement | null>(null);
 	let receiptFileName = $state('');
 	let submitting = $state(false);
+	let txType = $state<'expense' | 'income'>('expense');
 
 	function today() {
 		const now = new Date();
@@ -58,6 +59,7 @@
 	function handleCancel() {
 		formEl?.reset();
 		receiptFileName = '';
+		txType = 'expense';
 		onClose();
 	}
 </script>
@@ -103,12 +105,41 @@
 						if (result.type === 'success') {
 							formEl?.reset();
 							receiptFileName = '';
+							txType = 'expense';
 							onClose();
 						}
 						await update();
 					};
 				}}
 			>
+				<div class="flex flex-col gap-1.5">
+					<span class="text-xs font-semibold text-dim">Type</span>
+					<div class="grid grid-cols-2 gap-2">
+						<button
+							type="button"
+							onclick={() => (txType = 'expense')}
+							aria-pressed={txType === 'expense'}
+							class="rounded-lg border px-2.75 py-2 text-[13px] font-semibold transition-colors duration-100 {txType ===
+							'expense'
+								? 'border-ink bg-panel-strong text-ink'
+								: 'border-border-strong bg-bg text-dim'}"
+						>
+							Expense
+						</button>
+						<button
+							type="button"
+							onclick={() => (txType = 'income')}
+							aria-pressed={txType === 'income'}
+							class="rounded-lg border px-2.75 py-2 text-[13px] font-semibold transition-colors duration-100 {txType ===
+							'income'
+								? 'border-green bg-green/12 text-green'
+								: 'border-border-strong bg-bg text-dim'}"
+						>
+							Income
+						</button>
+					</div>
+					<input type="hidden" name="type" value={txType} />
+				</div>
 				<div class="flex flex-col gap-1.5">
 					<label for="tx-description" class="text-xs font-semibold text-dim">Description</label>
 					<input

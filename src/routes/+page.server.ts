@@ -254,6 +254,7 @@ export const actions: Actions = {
 		const categoryId = parseId(formData.get('category_id'));
 		const date = formData.get('date')?.toString();
 		const receipt = formData.get('receipt');
+		const type = formData.get('type')?.toString();
 
 		if (
 			!Number.isFinite(amount) ||
@@ -263,6 +264,12 @@ export const actions: Actions = {
 		) {
 			return fail(400, { message: 'Missing required fields' });
 		}
+
+		if (type !== 'income' && type !== 'expense') {
+			return fail(400, { message: 'Invalid transaction type' });
+		}
+
+		const signedAmount = type === 'income' ? Math.abs(amount) : -Math.abs(amount);
 
 		const [ownedAccount] = await db
 			.select({ id: accounts.id })
@@ -297,7 +304,7 @@ export const actions: Actions = {
 		}
 
 		await db.insert(transactions).values({
-			amount,
+			amount: signedAmount,
 			description,
 			account_id: accountId,
 			category_id: categoryId,
