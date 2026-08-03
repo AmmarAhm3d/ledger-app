@@ -1,11 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { timingSafeEqual } from 'node:crypto';
-import { and, eq, isNotNull, lt } from 'drizzle-orm';
-import { del } from '@vercel/blob';
 import { CRON_SECRET } from '$env/static/private';
-import { env } from '$env/dynamic/private';
-import { db } from '$lib/server/db';
-import { transactions } from '$lib/server/db/schema';
 import {
 	getBlobStorageUsage,
 	getLatestStorageSnapshot,
@@ -14,7 +9,6 @@ import {
 } from '$lib/server/blob';
 import type { RequestHandler } from './$types';
 
-const RETENTION_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 const QUOTA_THRESHOLD_BYTES = 999 * 1024 * 1024; // ~999 MB trigger threshold
@@ -35,37 +29,12 @@ export const GET: RequestHandler = async ({ request }) => {
 		throw error(401, 'Unauthorized');
 	}
 
-	// 1. Age-based purge (>30 days old)
-	const cutoff = new Date(Date.now() - RETENTION_DAYS * DAY_MS).toISOString();
-	const staleReceipts = await db
-		.select({ id: transactions.id, receipt_url: transactions.receipt_url })
-		.from(transactions)
-		.where(and(isNotNull(transactions.receipt_url), lt(transactions.created_at, cutoff)));
-
-	let deletedAge = 0;
-	const failuresAge: number[] = [];
-
-	for (const row of staleReceipts) {
-		if (!row.receipt_url) continue;
-		try {
-			await del(row.receipt_url, {
-				oidcToken: env.VERCEL_OIDC_TOKEN,
-				storeId: env.BLOB_STORE_ID
-			});
-			await db
-				.update(transactions)
-				.set({ has_receipt: false, receipt_url: null })
-				.where(eq(transactions.id, row.id));
-			deletedAge += 1;
-		} catch {
-			failuresAge.push(row.id);
-		}
-	}
-
-	// 2. Quota-based auto-purge (trigger if >999 MB)
+	// 1. Quota-based auto-purge: bucket size is fixed (plan limit), so purging the
+	// oldest receipts once usage crosses the threshold makes a separate age-based
+	// rule redundant — this alone keeps storage bounded.
 	const quotaResult = await purgeStorageQuotaIfNeeded(QUOTA_THRESHOLD_BYTES);
 
-	// 3. Weekly usage snapshot
+	// 2. Weekly usage snapshot
 	let snapshotRecorded = false;
 	const latestSnapshot = await getLatestStorageSnapshot();
 	const nowMs = Date.now();
@@ -75,7 +44,10 @@ export const GET: RequestHandler = async ({ request }) => {
 		!latestSnapshot.created_at ||
 		nowMs - new Date(latestSnapshot.created_at).getTime() >= WEEK_MS;
 
-	let currentUsage = { totalBytes: quotaResult.remainingBytes, blobCount: 0 };
+	let currentUsage = {
+		totalBytes: quotaResult.remainingBytes,
+		blobCount: quotaResult.remainingBlobCount
+	};
 
 	if (shouldRecordSnapshot) {
 		const usage = await getBlobStorageUsage();
@@ -85,12 +57,6 @@ export const GET: RequestHandler = async ({ request }) => {
 	}
 
 	return json({
-		agePurge: {
-			checked: staleReceipts.length,
-			deleted: deletedAge,
-			failed: failuresAge.length,
-			failedIds: failuresAge
-		},
 		quotaPurge: {
 			thresholdBytes: QUOTA_THRESHOLD_BYTES,
 			purgedCount: quotaResult.purgedCount,
