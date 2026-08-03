@@ -65,6 +65,7 @@
 		accounts={data.accounts}
 		categories={data.categories}
 		onClose={() => (activeModal = null)}
+		onBulkImport={() => (activeModal = 'bulkImport')}
 	/>
 
 	<TransferModal

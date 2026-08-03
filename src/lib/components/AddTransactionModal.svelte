@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Paperclip } from '@lucide/svelte';
+	import { Paperclip, Import } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import type { Account, Category } from '$lib/types';
 
@@ -8,9 +8,10 @@
 		accounts: Account[];
 		categories: Category[];
 		onClose: () => void;
+		onBulkImport?: () => void;
 	}
 
-	let { open, accounts, categories, onClose }: Props = $props();
+	let { open, accounts, categories, onClose, onBulkImport }: Props = $props();
 
 	let formEl = $state<HTMLFormElement | null>(null);
 	let fileInputEl = $state<HTMLInputElement | null>(null);
@@ -63,6 +64,14 @@
 		errorMessage = '';
 		onClose();
 	}
+
+	function handleSwitchToBulkImport() {
+		formEl?.reset();
+		receiptFileName = '';
+		txType = 'expense';
+		errorMessage = '';
+		onBulkImport?.();
+	}
 </script>
 
 <svelte:window onkeydown={(e) => open && e.key === 'Escape' && handleCancel()} />
@@ -82,11 +91,23 @@
 			role="presentation"
 			class="flex max-h-[90vh] w-full max-w-108 flex-col gap-3.75 overflow-y-auto rounded-2xl border border-border-strong bg-panel-2 p-5 shadow-2xl"
 		>
-			<div>
-				<div class="text-[15.5px] font-semibold tracking-tight">Add transaction</div>
-				<div class="mt-0.5 text-[12.5px] text-muted">
-					Logged to your personal ledger with an audit entry.
+			<div class="flex items-start justify-between gap-3">
+				<div>
+					<div class="text-[15.5px] font-semibold tracking-tight">Add transaction</div>
+					<div class="mt-0.5 text-[12.5px] text-muted">
+						Logged to your personal ledger with an audit entry.
+					</div>
 				</div>
+				{#if onBulkImport}
+					<button
+						type="button"
+						onclick={handleSwitchToBulkImport}
+						class="flex flex-none items-center gap-1.25 pt-0.5 text-[11.5px] font-semibold text-accent-hover hover:underline"
+					>
+						<Import size={12} strokeWidth={2.2} />
+						Bulk import instead
+					</button>
+				{/if}
 			</div>
 			{#if errorMessage}
 				<div class="rounded-lg border border-red/40 bg-red/10 px-3 py-2 text-xs text-red">
