@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { browser } from '$app/environment';
 	import { authClient } from '$lib/auth-client';
+	import { getStoredPin, setStoredPin, clearStoredPin } from '$lib/pin-storage';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import DashboardHeader from '$lib/components/DashboardHeader.svelte';
 	import KPICards from '$lib/components/KPICards.svelte';
@@ -30,8 +32,8 @@
 	let range = $state<30 | 90>(30);
 	let mobileNavOpen = $state(false);
 
-	let accountsOpen = $state(false);
-	let categoriesOpen = $state(false);
+	type ModalKey = 'accounts' | 'categories' | 'addTransaction' | 'pin' | null;
+	let activeModal = $state<ModalKey>(null);
 
 	let transactions = $derived<Transaction[]>(
 		data.transactions.map((tx) => ({
@@ -45,10 +47,10 @@
 	);
 
 	let balanceHidden = $state(true);
-	let pinOpen = $state(false);
 	let pin = $state('');
-
-	let addTransactionOpen = $state(false);
+	let pinStage = $state<'create' | 'confirm' | 'unlock'>('unlock');
+	let pinPending = $state('');
+	let pinError = $state(false);
 
 	let accountsTotal = $derived(accounts.reduce((sum, a) => sum + a.balance, 0));
 
@@ -60,25 +62,70 @@
 	function handleToggleBalance() {
 		if (balanceHidden) {
 			pin = '';
-			pinOpen = true;
+			pinPending = '';
+			pinError = false;
+			pinStage = browser && getStoredPin() ? 'unlock' : 'create';
+			activeModal = 'pin';
 		} else {
 			balanceHidden = true;
 		}
 	}
 
+	function unlockBalance() {
+		balanceHidden = false;
+		activeModal = null;
+		pin = '';
+		pinPending = '';
+		pinError = false;
+	}
+
+	function handlePinReset() {
+		clearStoredPin();
+		pin = '';
+		pinPending = '';
+		pinError = false;
+		pinStage = 'create';
+	}
+
 	function handlePressKey(key: string) {
 		if (key === '⌫') {
 			pin = pin.slice(0, -1);
+			pinError = false;
 			return;
 		}
+		pinError = false;
 		const next = (pin + key).slice(0, 4);
 		pin = next;
-		if (next.length === 4) {
-			setTimeout(() => {
-				balanceHidden = false;
-				pinOpen = false;
+		if (next.length < 4) return;
+
+		if (pinStage === 'create') {
+			pinPending = next;
+			pin = '';
+			pinStage = 'confirm';
+			return;
+		}
+
+		if (pinStage === 'confirm') {
+			if (next === pinPending) {
+				setStoredPin(next);
+				setTimeout(unlockBalance, 180);
+			} else {
+				pinError = true;
 				pin = '';
-			}, 180);
+				pinPending = '';
+				pinStage = 'create';
+			}
+			return;
+		}
+
+		if (next === getStoredPin()) {
+			setTimeout(unlockBalance, 180);
+		} else {
+			pinError = true;
+			setTimeout(() => {
+				pin = '';
+				pinError = false;
+			}, 400);
 		}
 	}
 
@@ -90,8 +137,8 @@
 		accountCount={accounts.length}
 		categoryCount={categories.length}
 		onNav={(key) => (nav = key)}
-		onManageAccounts={() => (accountsOpen = true)}
-		onManageCategories={() => (categoriesOpen = true)}
+		onManageAccounts={() => (activeModal = 'accounts')}
+		onManageCategories={() => (activeModal = 'categories')}
 		onSignOut={handleSignOut}
 		open={mobileNavOpen}
 		onClose={() => (mobileNavOpen = false)}
@@ -101,7 +148,7 @@
 		<DashboardHeader
 			title="Overview"
 			subtitle="February 2026 · synced 4 minutes ago"
-			onAddTransaction={() => (addTransactionOpen = true)}
+			onAddTransaction={() => (activeModal = 'addTransaction')}
 			onToggleNav={() => (mobileNavOpen = true)}
 		/>
 
@@ -131,25 +178,33 @@
 </div>
 
 <AccountsModal
-	open={accountsOpen}
+	open={activeModal === 'accounts'}
 	{accounts}
-	onClose={() => (accountsOpen = false)}
+	onClose={() => (activeModal = null)}
 	errorMessage={form?.message}
 />
 
 <CategoriesModal
-	open={categoriesOpen}
+	open={activeModal === 'categories'}
 	{categories}
-	onClose={() => (categoriesOpen = false)}
+	onClose={() => (activeModal = null)}
 	errorMessage={form?.message}
 />
 
-<PinModal open={pinOpen} {pin} onPressKey={handlePressKey} onClose={() => (pinOpen = false)} />
+<PinModal
+	open={activeModal === 'pin'}
+	{pin}
+	mode={pinStage}
+	error={pinError}
+	onPressKey={handlePressKey}
+	onClose={() => (activeModal = null)}
+	onReset={handlePinReset}
+/>
 
 <AddTransactionModal
-	open={addTransactionOpen}
+	open={activeModal === 'addTransaction'}
 	{accounts}
 	{categories}
-	onClose={() => (addTransactionOpen = false)}
+	onClose={() => (activeModal = null)}
 	errorMessage={form?.message}
 />

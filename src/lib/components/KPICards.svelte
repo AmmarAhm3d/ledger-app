@@ -74,8 +74,12 @@
 			<TrendingUp size={14} strokeWidth={1.9} />
 			Monthly income
 		</div>
-		<div class="mt-2.5 font-mono text-[29px] font-medium tracking-tight">
-			{formatPKR(monthlyIncome)}
+		<div
+			class="mt-2.5 font-mono text-[29px] font-medium tracking-tight"
+			class:text-muted={balanceHidden}
+			class:text-ink={!balanceHidden}
+		>
+			{balanceHidden ? '••••••••' : formatPKR(monthlyIncome)}
 		</div>
 		<div class="mt-2 flex items-center gap-1.5 text-xs text-muted">
 			{#if incomeChangePct >= 0}
@@ -104,8 +108,12 @@
 			<TrendingDown size={14} strokeWidth={1.9} />
 			Monthly expenses
 		</div>
-		<div class="mt-2.5 font-mono text-[29px] font-medium tracking-tight">
-			{formatPKR(monthlyExpenses)}
+		<div
+			class="mt-2.5 font-mono text-[29px] font-medium tracking-tight"
+			class:text-muted={balanceHidden}
+			class:text-ink={!balanceHidden}
+		>
+			{balanceHidden ? '••••••••' : formatPKR(monthlyExpenses)}
 		</div>
 		<div class="mt-2 flex items-center gap-1.5 text-xs text-muted">
 			{#if expenseChangePct > 0}
