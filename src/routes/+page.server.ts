@@ -4,6 +4,7 @@ import { put } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
+import { parseAmount, parseOptionalAmount, parseId } from '$lib/server/form-utils';
 import type { AccountType, CategorySpend } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -21,55 +22,30 @@ const ALLOWED_RECEIPT_TYPES: Record<string, string> = {
 	'application/pdf': 'pdf'
 };
 
-function parseAmount(raw: FormDataEntryValue | null): number {
-	const cleaned = String(raw ?? '').replace(/[^0-9.-]/g, '');
-	return cleaned === '' ? NaN : Number(cleaned);
-}
-
-function parseOptionalAmount(raw: FormDataEntryValue | null, fallback = 0): number {
-	if (String(raw ?? '').trim() === '') return fallback;
-	return parseAmount(raw);
-}
-
-function parseId(raw: FormDataEntryValue | null): number {
-	const id = Number(raw);
-	return Number.isInteger(id) && id > 0 ? id : NaN;
-}
-
-function toAccountType(value: string): AccountType {
-	if (!ACCOUNT_TYPES.includes(value as AccountType)) {
-		throw error(500, `Unexpected account type in database: ${value}`);
-	}
-	return value as AccountType;
-}
-
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, parent }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 	const userId = locals.user.id;
+	const { categories: categoryRows } = await parent();
 
-	const [accountRows, categoryRows, transactionRows] = await Promise.all([
-		db.select().from(accounts).where(eq(accounts.user_id, userId)).orderBy(accounts.id),
-		db.select().from(categories).where(eq(categories.user_id, userId)).orderBy(categories.id),
-		db
-			.select({
-				id: transactions.id,
-				amount: transactions.amount,
-				date: transactions.date,
-				description: transactions.description,
-				account_id: transactions.account_id,
-				category_id: transactions.category_id,
-				is_transfer: transactions.is_transfer,
-				has_receipt: transactions.has_receipt,
-				receipt_url: transactions.receipt_url,
-				account_name: accounts.name,
-				category_name: categories.name
-			})
-			.from(transactions)
-			.innerJoin(accounts, eq(transactions.account_id, accounts.id))
-			.leftJoin(categories, eq(transactions.category_id, categories.id))
-			.where(eq(transactions.user_id, userId))
-			.orderBy(desc(transactions.date), desc(transactions.id))
-	]);
+	const transactionRows = await db
+		.select({
+			id: transactions.id,
+			amount: transactions.amount,
+			date: transactions.date,
+			description: transactions.description,
+			account_id: transactions.account_id,
+			category_id: transactions.category_id,
+			is_transfer: transactions.is_transfer,
+			has_receipt: transactions.has_receipt,
+			receipt_url: transactions.receipt_url,
+			account_name: accounts.name,
+			category_name: categories.name
+		})
+		.from(transactions)
+		.innerJoin(accounts, eq(transactions.account_id, accounts.id))
+		.leftJoin(categories, eq(transactions.category_id, categories.id))
+		.where(eq(transactions.user_id, userId))
+		.orderBy(desc(transactions.date), desc(transactions.id));
 
 	const now = new Date();
 	const currentMonthPrefix = now.toISOString().slice(0, 7);
@@ -141,17 +117,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const monthlyBudgetCap = categoryRows.reduce((sum, c) => sum + c.monthly_cap, 0);
 
 	return {
-		accounts: accountRows.map((a) => ({
-			id: a.id,
-			name: a.name,
-			type: toAccountType(a.type),
-			balance: a.balance
-		})),
-		categories: categoryRows.map((c) => ({
-			id: c.id,
-			name: c.name,
-			monthly_cap: c.monthly_cap
-		})),
+		title: 'Overview',
+		subtitle: 'Synced just now',
 		transactions: transactionRows,
 		monthlyIncome,
 		monthlyExpenses,
@@ -203,48 +170,6 @@ export const actions: Actions = {
 			.update(accounts)
 			.set({ balance })
 			.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user.id)));
-	},
-
-	addCategory: async ({ request, locals }) => {
-		if (!locals.user) return fail(401, { message: 'Unauthorized' });
-		const form = await request.formData();
-		const name = String(form.get('name') ?? '').trim();
-		const monthlyCap = parseOptionalAmount(form.get('monthly_cap'));
-
-		if (!name) return fail(400, { message: 'Category name is required' });
-		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
-
-		await db
-			.insert(categories)
-			.values({ name, monthly_cap: monthlyCap, user_id: locals.user.id });
-	},
-
-	updateCategory: async ({ request, locals }) => {
-		if (!locals.user) return fail(401, { message: 'Unauthorized' });
-		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		const name = String(form.get('name') ?? '').trim();
-		const monthlyCap = parseOptionalAmount(form.get('monthly_cap'));
-
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
-		if (Number.isNaN(monthlyCap)) return fail(400, { message: 'Monthly cap must be a number' });
-		if (!name) return fail(400, { message: 'Category name is required' });
-
-		await db
-			.update(categories)
-			.set({ name, monthly_cap: monthlyCap })
-			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
-	},
-
-	removeCategory: async ({ request, locals }) => {
-		if (!locals.user) return fail(401, { message: 'Unauthorized' });
-		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid category id' });
-
-		await db
-			.delete(categories)
-			.where(and(eq(categories.id, id), eq(categories.user_id, locals.user.id)));
 	},
 
 	addTransaction: async ({ request, locals }) => {

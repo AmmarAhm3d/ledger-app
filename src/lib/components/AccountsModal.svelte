@@ -8,14 +8,18 @@
 		open: boolean;
 		accounts: Account[];
 		onClose: () => void;
-		errorMessage?: string;
 	}
 
-	let { open, accounts, onClose, errorMessage }: Props = $props();
+	let { open, accounts, onClose }: Props = $props();
 
 	let newName = $state('');
 	let newType = $state<AccountType>('Bank');
 	let newAmount = $state('');
+	let errorMessage = $state('');
+
+	function handleResult(result: { type: string; data?: Record<string, unknown> }) {
+		errorMessage = result.type === 'failure' ? String(result.data?.message ?? 'Something went wrong') : '';
+	}
 
 	let total = $derived(accounts.reduce((sum, a) => sum + a.balance, 0));
 </script>
@@ -66,9 +70,10 @@
 						</div>
 						<form
 						method="POST"
-						action="?/updateAccountBalance"
+						action="/?/updateAccountBalance"
 						use:enhance={() => {
-							return async ({ update }) => {
+							return async ({ result, update }) => {
+								handleResult(result);
 								await update({ reset: false });
 							};
 						}}
@@ -81,7 +86,16 @@
 								class="w-27.5 rounded-lg border border-border-strong bg-panel-2 px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
 							/>
 						</form>
-						<form method="POST" action="?/removeAccount" use:enhance>
+						<form
+							method="POST"
+							action="/?/removeAccount"
+							use:enhance={() => {
+								return async ({ result, update }) => {
+									handleResult(result);
+									await update();
+								};
+							}}
+						>
 							<input type="hidden" name="id" value={account.id} />
 							<button
 								type="submit"
@@ -102,13 +116,16 @@
 
 			<form
 				method="POST"
-				action="?/addAccount"
+				action="/?/addAccount"
 				use:enhance={() => {
-					return async ({ update }) => {
+					return async ({ result, update }) => {
+						handleResult(result);
 						await update();
-						newName = '';
-						newAmount = '';
-						newType = 'Bank';
+						if (result.type === 'success') {
+							newName = '';
+							newAmount = '';
+							newType = 'Bank';
+						}
 					};
 				}}
 				class="flex flex-col gap-2.5 border-t border-border pt-3.5"

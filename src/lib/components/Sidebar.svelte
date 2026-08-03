@@ -9,52 +9,34 @@
 		LogOut,
 		X
 	} from '@lucide/svelte';
-	import type { NavKey } from '$lib/types';
+	import { page } from '$app/state';
 
 	interface Props {
-		nav: NavKey;
 		accountCount: number;
 		categoryCount: number;
-		onNav: (key: NavKey) => void;
 		onManageAccounts: () => void;
-		onManageCategories: () => void;
 		onSignOut: () => void;
 		open?: boolean;
 		onClose?: () => void;
 	}
 
-	let {
-		nav,
-		accountCount,
-		categoryCount,
-		onNav,
-		onManageAccounts,
-		onManageCategories,
-		onSignOut,
-		open = false,
-		onClose
-	}: Props = $props();
+	let { accountCount, categoryCount, onManageAccounts, onSignOut, open = false, onClose }: Props =
+		$props();
 
-	const items: { key: NavKey; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
-		{ key: 'overview', label: 'Overview', icon: LayoutDashboard },
-		{ key: 'transactions', label: 'Transactions', icon: ArrowLeftRight },
-		{ key: 'categories', label: 'Categories', icon: Tag },
-		{ key: 'receipts', label: 'Receipts', icon: Receipt, badge: 12 },
-		{ key: 'settings', label: 'Settings', icon: Settings }
+	const items: { href: string; label: string; icon: typeof LayoutDashboard }[] = [
+		{ href: '/', label: 'Overview', icon: LayoutDashboard },
+		{ href: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+		{ href: '/categories', label: 'Categories', icon: Tag },
+		{ href: '/receipts', label: 'Receipts', icon: Receipt },
+		{ href: '/settings', label: 'Settings', icon: Settings }
 	];
 
-	function handleNav(key: NavKey) {
-		onNav(key);
-		onClose?.();
+	function isActive(href: string) {
+		return href === '/' ? page.url.pathname === '/' : page.url.pathname.startsWith(href);
 	}
 
 	function handleManageAccounts() {
 		onManageAccounts();
-		onClose?.();
-	}
-
-	function handleManageCategories() {
-		onManageCategories();
 		onClose?.();
 	}
 </script>
@@ -103,24 +85,19 @@
 	</div>
 
 	<nav class="flex flex-col gap-0.5">
-		{#each items as item (item.key)}
-			<button
-				onclick={() => handleNav(item.key)}
+		{#each items as item (item.href)}
+			<a
+				href={item.href}
+				onclick={() => onClose?.()}
+				aria-current={isActive(item.href) ? 'page' : undefined}
 				class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13.5px] font-medium transition-colors duration-100 hover:bg-panel-hover"
-				class:bg-panel-strong={nav === item.key}
-				class:text-ink={nav === item.key}
-				class:text-subtle={nav !== item.key}
+				class:bg-panel-strong={isActive(item.href)}
+				class:text-ink={isActive(item.href)}
+				class:text-subtle={!isActive(item.href)}
 			>
 				<item.icon size={16} strokeWidth={1.9} />
 				{item.label}
-				{#if item.badge}
-					<span
-						class="ml-auto rounded-md bg-panel-hover px-1.5 py-0.5 font-mono text-[10.5px] text-subtle"
-					>
-						{item.badge}
-					</span>
-				{/if}
-			</button>
+			</a>
 		{/each}
 	</nav>
 
@@ -139,8 +116,9 @@
 				<div class="text-[11px] text-muted">{accountCount} linked · entered manually</div>
 			</div>
 		</button>
-		<button
-			onclick={handleManageCategories}
+		<a
+			href="/categories"
+			onclick={() => onClose?.()}
 			class="flex items-center gap-2.5 rounded-[10px] border border-border bg-panel-2 px-2.5 py-2.5 text-left transition-colors duration-100 hover:bg-panel-hover"
 		>
 			<div
@@ -152,7 +130,7 @@
 				<div class="text-xs font-semibold text-ink">Manage categories</div>
 				<div class="text-[11px] text-muted">{categoryCount} tracked</div>
 			</div>
-		</button>
+		</a>
 		<button
 			onclick={onSignOut}
 			class="flex items-center gap-2.5 rounded-[10px] border border-border bg-panel-2 px-2.5 py-2.5 text-left transition-colors duration-100 hover:bg-panel-hover"

@@ -6,15 +6,15 @@
 		open: boolean;
 		accounts: Account[];
 		onClose: () => void;
-		errorMessage?: string;
 	}
 
-	let { open, accounts, onClose, errorMessage }: Props = $props();
+	let { open, accounts, onClose }: Props = $props();
 
 	let formEl = $state<HTMLFormElement | null>(null);
 	let submitting = $state(false);
 	let fromAccountId = $state('');
 	let toAccountId = $state('');
+	let errorMessage = $state('');
 
 	function today() {
 		const now = new Date();
@@ -28,6 +28,7 @@
 		formEl?.reset();
 		fromAccountId = '';
 		toAccountId = '';
+		errorMessage = '';
 		onClose();
 	}
 </script>
@@ -63,12 +64,16 @@
 			<form
 				bind:this={formEl}
 				method="POST"
-				action="?/transfer"
+				action="/?/transfer"
 				class="flex flex-col gap-3.75"
 				use:enhance={() => {
 					submitting = true;
 					return async ({ result, update }) => {
 						submitting = false;
+						errorMessage =
+							result.type === 'failure'
+								? String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
+								: '';
 						if (result.type === 'success') {
 							formEl?.reset();
 							fromAccountId = '';
