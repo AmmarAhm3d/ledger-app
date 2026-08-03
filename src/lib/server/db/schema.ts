@@ -96,3 +96,11 @@ export const verification = sqliteTable('verification', {
 	createdAt: integer('created_at', { mode: 'timestamp' }),
 	updatedAt: integer('updated_at', { mode: 'timestamp' })
 });
+
+export const storageUsage = sqliteTable('storage_usage', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	total_bytes: integer('total_bytes', { mode: 'number' }).notNull().default(0),
+	blob_count: integer('blob_count').notNull().default(0),
+	...timestamps
+});
+
