@@ -1,5 +1,3 @@
-export type NavKey = 'overview' | 'transactions' | 'categories' | 'receipts' | 'settings';
-
 export type AccountType = 'Bank' | 'Microfinance / Wallet' | 'Cash';
 
 export interface Account {

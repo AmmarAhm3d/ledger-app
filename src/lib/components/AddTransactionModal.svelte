@@ -8,16 +8,16 @@
 		accounts: Account[];
 		categories: Category[];
 		onClose: () => void;
-		errorMessage?: string;
 	}
 
-	let { open, accounts, categories, onClose, errorMessage }: Props = $props();
+	let { open, accounts, categories, onClose }: Props = $props();
 
 	let formEl = $state<HTMLFormElement | null>(null);
 	let fileInputEl = $state<HTMLInputElement | null>(null);
 	let receiptFileName = $state('');
 	let submitting = $state(false);
 	let txType = $state<'expense' | 'income'>('expense');
+	let errorMessage = $state('');
 
 	function today() {
 		const now = new Date();
@@ -60,6 +60,7 @@
 		formEl?.reset();
 		receiptFileName = '';
 		txType = 'expense';
+		errorMessage = '';
 		onClose();
 	}
 </script>
@@ -95,13 +96,17 @@
 			<form
 				bind:this={formEl}
 				method="POST"
-				action="?/addTransaction"
+				action="/?/addTransaction"
 				enctype="multipart/form-data"
 				class="flex flex-col gap-3.75"
 				use:enhance={() => {
 					submitting = true;
 					return async ({ result, update }) => {
 						submitting = false;
+						errorMessage =
+							result.type === 'failure'
+								? String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
+								: '';
 						if (result.type === 'success') {
 							formEl?.reset();
 							receiptFileName = '';

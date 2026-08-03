@@ -5,9 +5,10 @@
 
 	interface Props {
 		transactions: Transaction[];
+		viewAllHref?: string;
 	}
 
-	let { transactions }: Props = $props();
+	let { transactions, viewAllHref }: Props = $props();
 
 	let rows = $derived(
 		transactions.map((tx) => ({
@@ -25,11 +26,14 @@
 		<span class="rounded-md bg-panel-hover px-1.5 py-0.5 font-mono text-[11px] text-subtle">
 			{transactions.length}
 		</span>
-		<button
-			class="ml-auto text-[12.5px] font-semibold text-accent hover:text-accent-hover"
-		>
-			View all
-		</button>
+		{#if viewAllHref}
+			<a
+				href={viewAllHref}
+				class="ml-auto text-[12.5px] font-semibold text-accent hover:text-accent-hover"
+			>
+				View all
+			</a>
+		{/if}
 	</div>
 	<div class="overflow-x-auto">
 		<div class="min-w-[640px]">
