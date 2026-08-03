@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { Copy, Check } from '@lucide/svelte';
-	import { formatPKR } from '$lib/format';
 	import {
 		parseAndValidateBulkImport,
+		parseBulkImportYaml,
 		buildImportPrompt,
 		type LineError,
 		type ValidatedBulkEntry
@@ -32,6 +32,24 @@
 	let accountLookups = $derived(accounts.map((a) => ({ id: a.id, name: a.name })));
 	let categoryLookups = $derived(categories.map((c) => ({ id: c.id, name: c.name })));
 
+	let examplePlaceholder = $derived.by(() => {
+		const todayIso = new Date().toISOString().slice(0, 10);
+		const accountNames = accounts.map((a) => a.name);
+		const categoryNames = categories.map((c) => c.name);
+		const [accountExample, ...accountRest] = accountNames.length ? accountNames : ['Cash'];
+		const [categoryExample, ...categoryRest] = categoryNames.length ? categoryNames : ['Category'];
+
+		return [
+			'transactions:',
+			`  - date: ${todayIso}`,
+			'    type: expense              # or income',
+			'    amount: 240                # Rs, positive number',
+			`    account: ${accountExample}${accountRest.length ? `        # or: ${accountRest.join(', ')}` : ''}`,
+			`    category: ${categoryExample}${categoryRest.length ? `      # or: ${categoryRest.join(', ')}` : ''}`,
+			'    description: description'
+		].join('\n');
+	});
+
 	let parsed = $derived(parseAndValidateBulkImport(yamlText, accountLookups, categoryLookups));
 	let entries = $derived<ValidatedBulkEntry[]>(parsed.entries);
 	let clientErrors = $derived<LineError[]>(yamlText.trim() === '' ? [] : parsed.errors);
@@ -40,11 +58,40 @@
 	let lineNumbers = $derived(Array.from({ length: lineCount }, (_, i) => i + 1));
 	let canPreview = $derived(yamlText.trim() !== '' && clientErrors.length === 0 && entries.length > 0);
 
-	function accountName(id: number) {
-		return accounts.find((a) => a.id === id)?.name ?? 'Unknown';
+	type EditableField = 'date' | 'type' | 'amount' | 'account' | 'category' | 'description' | 'note';
+
+	// Preview-stage entries are edited by rewriting the exact source line they were
+	// parsed from — yamlText (submitted as-is on import) stays the single source of
+	// truth, so an edited preview and the raw block can never drift apart.
+	let rawParsed = $derived(parseBulkImportYaml(yamlText));
+
+	function updateEntryField(index: number, field: EditableField, rawValue: string) {
+		const rawEntry = rawParsed.entries[index];
+		if (!rawEntry) return;
+		const lines = yamlText.split('\n');
+		const lineNo = rawEntry.fieldLines[field];
+		if (lineNo !== undefined) {
+			const line = lines[lineNo - 1];
+			const colonIndex = line.indexOf(':');
+			if (colonIndex === -1) return;
+			lines[lineNo - 1] = `${line.slice(0, colonIndex + 1)} ${rawValue}`;
+		} else {
+			const knownLines = Object.values(rawEntry.fieldLines).filter(
+				(n): n is number => n !== undefined
+			);
+			const insertAfter = knownLines.length ? Math.max(...knownLines) : rawEntry.startLine;
+			lines.splice(insertAfter, 0, `    ${field}: ${rawValue}`);
+		}
+		yamlText = lines.join('\n');
 	}
-	function categoryName(id: number) {
-		return categories.find((c) => c.id === id)?.name ?? 'Unknown';
+
+	function updateEntryAccount(index: number, accountId: number) {
+		const name = accounts.find((a) => a.id === accountId)?.name;
+		if (name) updateEntryField(index, 'account', name);
+	}
+	function updateEntryCategory(index: number, categoryId: number) {
+		const name = categories.find((c) => c.id === categoryId)?.name;
+		if (name) updateEntryField(index, 'category', name);
 	}
 
 	function syncGutterScroll() {
@@ -112,7 +159,7 @@
 			</div>
 
 			{#if stage === 'edit'}
-				<div class="flex overflow-hidden rounded-lg border border-border-strong bg-bg">
+				<div class="flex h-64 overflow-hidden rounded-lg border border-border-strong bg-bg">
 					<div
 						bind:this={gutterEl}
 						class="select-none overflow-hidden py-2.5 pl-2.5 pr-2 text-right font-mono text-[11px] leading-5 text-faint"
@@ -129,8 +176,8 @@
 						oninput={syncGutterScroll}
 						spellcheck="false"
 						wrap="off"
-						placeholder={'transactions:\n  - date: 2026-08-02\n    type: expense\n    amount: 240\n    account: Cash\n    category: Food\n    description: Roti'}
-						class="h-64 min-w-0 flex-1 resize-y overflow-auto whitespace-pre bg-transparent py-2.5 pr-2.5 font-mono text-[12px] leading-5 text-ink outline-none placeholder:text-faint"
+						placeholder={examplePlaceholder}
+						class="h-64 min-w-0 flex-1 resize-none overflow-auto whitespace-pre bg-transparent py-2.5 pr-2.5 font-mono text-[12px] leading-5 text-ink outline-none placeholder:text-faint"
 					></textarea>
 				</div>
 
@@ -199,17 +246,78 @@
 						<tbody>
 							{#each entries as entry, i (i)}
 								<tr class="border-b border-border last:border-b-0">
-									<td class="px-2.5 py-2 font-mono text-ink">{entry.date}</td>
-									<td class="px-2.5 py-2 {entry.type === 'income' ? 'text-green' : 'text-dim'}"
-										>{entry.type}</td
-									>
-									<td class="px-2.5 py-2 font-mono text-ink">{formatPKR(entry.amount)}</td>
-									<td class="px-2.5 py-2 text-dim">{accountName(entry.account_id)}</td>
-									<td class="px-2.5 py-2 text-dim">{categoryName(entry.category_id)}</td>
-									<td class="px-2.5 py-2 text-dim">{entry.description}</td>
-									<td class="max-w-50 truncate px-2.5 py-2 text-muted" title={entry.note ?? ''}
-										>{entry.note ?? '—'}</td
-									>
+									<td class="px-1.5 py-1">
+										<input
+											type="date"
+											value={entry.date}
+											onchange={(e) => updateEntryField(i, 'date', e.currentTarget.value)}
+											class="w-full min-w-31 rounded-md border border-transparent bg-transparent px-1 py-1 font-mono text-[12px] text-ink outline-none focus:border-accent focus:bg-panel"
+										/>
+									</td>
+									<td class="px-1.5 py-1">
+										<select
+											value={entry.type}
+											onchange={(e) => updateEntryField(i, 'type', e.currentTarget.value)}
+											class="rounded-md border border-transparent bg-transparent px-1 py-1 text-[12px] outline-none focus:border-accent focus:bg-panel {entry.type ===
+											'income'
+												? 'text-green'
+												: 'text-dim'}"
+										>
+											<option value="expense">expense</option>
+											<option value="income">income</option>
+										</select>
+									</td>
+									<td class="px-1.5 py-1">
+										<input
+											type="number"
+											step="0.01"
+											min="0.01"
+											value={entry.amount}
+											onchange={(e) => updateEntryField(i, 'amount', e.currentTarget.value)}
+											class="w-full min-w-20 rounded-md border border-transparent bg-transparent px-1 py-1 font-mono text-[12px] text-ink outline-none focus:border-accent focus:bg-panel"
+										/>
+									</td>
+									<td class="px-1.5 py-1">
+										<select
+											value={entry.account_id}
+											onchange={(e) =>
+												updateEntryAccount(i, Number(e.currentTarget.value))}
+											class="w-full min-w-30 rounded-md border border-transparent bg-transparent px-1 py-1 text-[12px] text-dim outline-none focus:border-accent focus:bg-panel"
+										>
+											{#each accounts as a (a.id)}
+												<option value={a.id}>{a.name}</option>
+											{/each}
+										</select>
+									</td>
+									<td class="px-1.5 py-1">
+										<select
+											value={entry.category_id}
+											onchange={(e) =>
+												updateEntryCategory(i, Number(e.currentTarget.value))}
+											class="w-full min-w-28 rounded-md border border-transparent bg-transparent px-1 py-1 text-[12px] text-dim outline-none focus:border-accent focus:bg-panel"
+										>
+											{#each categories as c (c.id)}
+												<option value={c.id}>{c.name}</option>
+											{/each}
+										</select>
+									</td>
+									<td class="px-1.5 py-1">
+										<input
+											type="text"
+											value={entry.description}
+											oninput={(e) => updateEntryField(i, 'description', e.currentTarget.value)}
+											class="w-full min-w-28 rounded-md border border-transparent bg-transparent px-1 py-1 text-[12px] text-dim outline-none focus:border-accent focus:bg-panel"
+										/>
+									</td>
+									<td class="px-1.5 py-1">
+										<input
+											type="text"
+											value={entry.note ?? ''}
+											placeholder="—"
+											oninput={(e) => updateEntryField(i, 'note', e.currentTarget.value)}
+											class="w-full min-w-32 rounded-md border border-transparent bg-transparent px-1 py-1 text-[12px] text-muted outline-none placeholder:text-faint focus:border-accent focus:bg-panel"
+										/>
+									</td>
 								</tr>
 							{/each}
 						</tbody>

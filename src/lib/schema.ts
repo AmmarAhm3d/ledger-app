@@ -91,7 +91,8 @@ export const updateTransactionSchema = z.object({
 	description: optionalDescription,
 	amount: finiteNumber('Amount must be a number'),
 	date: requiredText('Date is required'),
-	category_id: positiveIntId('Invalid category')
+	category_id: positiveIntId('Invalid category'),
+	account_id: positiveIntId('Invalid account')
 });
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 

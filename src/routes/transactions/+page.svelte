@@ -250,7 +250,16 @@
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="min-w-0 truncate rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 text-[13px] font-medium text-ink outline-none focus:border-accent focus:bg-panel"
 						/>
-						<div class="truncate text-[12px] text-muted">{tx.account_name}</div>
+						<select
+							name="account_id"
+							value={tx.account_id}
+							onchange={(e) => e.currentTarget.form?.requestSubmit()}
+							class="min-w-0 truncate rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 text-[12px] text-muted outline-none focus:border-accent focus:bg-panel"
+						>
+							{#each data.accounts as account (account.id)}
+								<option value={account.id}>{account.name}</option>
+							{/each}
+						</select>
 						<select
 							name="category_id"
 							value={tx.category_id}
