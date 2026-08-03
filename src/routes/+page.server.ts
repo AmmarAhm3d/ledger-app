@@ -288,7 +288,7 @@ export const actions: Actions = {
 					date,
 					has_receipt: receiptUrl !== null,
 					receipt_url: receiptUrl,
-					user_id: locals.user.id
+					user_id: userId
 				});
 
 				await tx
@@ -296,9 +296,9 @@ export const actions: Actions = {
 					.set({ balance: sql`${accounts.balance} + ${signedAmount}` })
 					.where(eq(accounts.id, account_id));
 			});
-			logger.info('Transaction created', { userId: locals.user.id, type, accountId: account_id });
+			logger.info('Transaction created', { userId, type, accountId: account_id });
 		} catch (error) {
-			logger.error('Failed to insert transaction', { userId: locals.user.id, error });
+			logger.error('Failed to insert transaction', { userId, error });
 			throw error;
 		}
 	},
