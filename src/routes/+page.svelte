@@ -13,6 +13,7 @@
 	import AccountsModal from '$lib/components/AccountsModal.svelte';
 	import CategoriesModal from '$lib/components/CategoriesModal.svelte';
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
+	import TransferModal from '$lib/components/TransferModal.svelte';
 	import type { NavKey, Transaction } from '$lib/types';
 	import type { ActionData, PageData } from './$types';
 
@@ -32,14 +33,14 @@
 	let range = $state<30 | 90>(30);
 	let mobileNavOpen = $state(false);
 
-	type ModalKey = 'accounts' | 'categories' | 'addTransaction' | 'pin' | null;
+	type ModalKey = 'accounts' | 'categories' | 'addTransaction' | 'transfer' | 'pin' | null;
 	let activeModal = $state<ModalKey>(null);
 
 	let transactions = $derived<Transaction[]>(
 		data.transactions.map((tx) => ({
 			name: tx.description ?? 'Transaction',
 			account: tx.account_name,
-			category: tx.category_name,
+			category: tx.is_transfer ? 'Transfer' : (tx.category_name ?? 'Uncategorized'),
 			date: tx.date,
 			amount: tx.amount,
 			hasReceipt: tx.has_receipt
@@ -149,6 +150,7 @@
 			title="Overview"
 			subtitle="February 2026 · synced 4 minutes ago"
 			onAddTransaction={() => (activeModal = 'addTransaction')}
+			onTransfer={() => (activeModal = 'transfer')}
 			onToggleNav={() => (mobileNavOpen = true)}
 		/>
 
@@ -205,6 +207,13 @@
 	open={activeModal === 'addTransaction'}
 	{accounts}
 	{categories}
+	onClose={() => (activeModal = null)}
+	errorMessage={form?.message}
+/>
+
+<TransferModal
+	open={activeModal === 'transfer'}
+	{accounts}
 	onClose={() => (activeModal = null)}
 	errorMessage={form?.message}
 />

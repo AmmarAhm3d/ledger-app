@@ -36,9 +36,8 @@ export const transactions = sqliteTable('transactions', {
 	account_id: integer('account_id')
 		.notNull()
 		.references(() => accounts.id),
-	category_id: integer('category_id')
-		.notNull()
-		.references(() => categories.id),
+	category_id: integer('category_id').references(() => categories.id),
+	is_transfer: integer('is_transfer', { mode: 'boolean' }).notNull().default(false),
 	has_receipt: integer('has_receipt', { mode: 'boolean' }).notNull().default(false),
 	receipt_url: text('receipt_url'),
 	user_id: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
