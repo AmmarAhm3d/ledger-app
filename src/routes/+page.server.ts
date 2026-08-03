@@ -237,6 +237,7 @@ export const actions: Actions = {
 
 	addTransaction: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const userId = locals.user.id;
 		const formData = await request.formData();
 		const receipt = formData.get('receipt');
 
@@ -278,15 +279,22 @@ export const actions: Actions = {
 		}
 
 		try {
-			await db.insert(transactions).values({
-				amount: signedAmount,
-				description,
-				account_id,
-				category_id,
-				date,
-				has_receipt: receiptUrl !== null,
-				receipt_url: receiptUrl,
-				user_id: locals.user.id
+			await db.transaction(async (tx) => {
+				await tx.insert(transactions).values({
+					amount: signedAmount,
+					description,
+					account_id,
+					category_id,
+					date,
+					has_receipt: receiptUrl !== null,
+					receipt_url: receiptUrl,
+					user_id: locals.user.id
+				});
+
+				await tx
+					.update(accounts)
+					.set({ balance: sql`${accounts.balance} + ${signedAmount}` })
+					.where(eq(accounts.id, account_id));
 			});
 			logger.info('Transaction created', { userId: locals.user.id, type, accountId: account_id });
 		} catch (error) {

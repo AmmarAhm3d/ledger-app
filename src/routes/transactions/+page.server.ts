@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
 import { parseAmount, parseId } from '$lib/server/form-utils';
@@ -43,6 +43,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 export const actions: Actions = {
 	updateTransaction: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const userId = locals.user.id;
 		const form = await request.formData();
 
 		const result = validate(updateTransactionSchema, {
@@ -64,20 +65,43 @@ export const actions: Actions = {
 		const [ownedCategory] = await db
 			.select({ id: categories.id })
 			.from(categories)
-			.where(and(eq(categories.id, categoryId), eq(categories.user_id, locals.user.id)));
+			.where(and(eq(categories.id, categoryId), eq(categories.user_id, userId)));
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
+		const [existing] = await db
+			.select({ amount: transactions.amount, account_id: transactions.account_id })
+			.from(transactions)
+			.where(
+				and(
+					eq(transactions.id, id),
+					eq(transactions.user_id, userId),
+					eq(transactions.is_transfer, false)
+				)
+			);
+		if (!existing) return fail(400, { message: 'Invalid transaction' });
+
+		const delta = amount - existing.amount;
+
 		try {
-			await db
-				.update(transactions)
-				.set({ description, amount, date, category_id: categoryId })
-				.where(
-					and(
-						eq(transactions.id, id),
-						eq(transactions.user_id, locals.user.id),
-						eq(transactions.is_transfer, false)
-					)
-				);
+			await db.transaction(async (tx) => {
+				await tx
+					.update(transactions)
+					.set({ description, amount, date, category_id: categoryId })
+					.where(
+						and(
+							eq(transactions.id, id),
+							eq(transactions.user_id, userId),
+							eq(transactions.is_transfer, false)
+						)
+					);
+
+				if (delta !== 0) {
+					await tx
+						.update(accounts)
+						.set({ balance: sql`${accounts.balance} + ${delta}` })
+						.where(eq(accounts.id, existing.account_id));
+				}
+			});
 			logger.info('Transaction updated', { userId: locals.user.id, transactionId: id });
 		} catch (error) {
 			logger.error('Failed to update transaction', {
@@ -91,6 +115,7 @@ export const actions: Actions = {
 
 	deleteTransactions: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const userId = locals.user.id;
 		const form = await request.formData();
 
 		const result = validate(deleteTransactionsSchema, {
@@ -108,17 +133,45 @@ export const actions: Actions = {
 		}
 		const { ids } = result.data;
 
+		const rowsToDelete = await db
+			.select({
+				id: transactions.id,
+				amount: transactions.amount,
+				account_id: transactions.account_id
+			})
+			.from(transactions)
+			.where(
+				and(
+					inArray(transactions.id, ids),
+					eq(transactions.user_id, userId),
+					eq(transactions.is_transfer, false)
+				)
+			);
+
+		if (rowsToDelete.length === 0) return fail(400, { message: 'No transactions selected' });
+
+		const balanceDeltas = new Map<number, number>();
+		for (const row of rowsToDelete) {
+			balanceDeltas.set(row.account_id, (balanceDeltas.get(row.account_id) ?? 0) - row.amount);
+		}
+
 		try {
-			await db
-				.delete(transactions)
-				.where(
-					and(
-						inArray(transactions.id, ids),
-						eq(transactions.user_id, locals.user.id),
-						eq(transactions.is_transfer, false)
+			await db.transaction(async (tx) => {
+				await tx.delete(transactions).where(
+					inArray(
+						transactions.id,
+						rowsToDelete.map((row) => row.id)
 					)
 				);
-			logger.info('Transactions deleted', { userId: locals.user.id, count: ids.length });
+
+				for (const [accountId, delta] of balanceDeltas) {
+					await tx
+						.update(accounts)
+						.set({ balance: sql`${accounts.balance} + ${delta}` })
+						.where(eq(accounts.id, accountId));
+				}
+			});
+			logger.info('Transactions deleted', { userId: locals.user.id, count: rowsToDelete.length });
 		} catch (error) {
 			logger.error('Failed to delete transactions', { userId: locals.user.id, error });
 			throw error;
