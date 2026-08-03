@@ -3,6 +3,7 @@ import { eq, desc } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
 import { storageUsage, transactions } from '$lib/server/db/schema';
+import { logger } from '$lib/server/logger';
 
 export interface BlobInfo {
 	url: string;
@@ -11,38 +12,32 @@ export interface BlobInfo {
 }
 
 export async function listAllBlobs(): Promise<BlobInfo[]> {
-	const blobMap = new Map<string, BlobInfo>();
-	const prefixes = ['receipts/', ''];
+	const blobs: BlobInfo[] = [];
+	let cursor: string | undefined = undefined;
+	let hasMore = true;
 
-	for (const prefix of prefixes) {
-		let cursor: string | undefined = undefined;
-		let hasMore = true;
-
-		while (hasMore) {
-			const options: { prefix?: string; cursor?: string; oidcToken?: string; storeId?: string } = {
-				oidcToken: env.VERCEL_OIDC_TOKEN,
-				storeId: env.BLOB_STORE_ID
-			};
-			if (prefix) {
-				options.prefix = prefix;
-			}
-			if (cursor) {
-				options.cursor = cursor;
-			}
-			const res = await list(options);
-			for (const item of res.blobs) {
-				blobMap.set(item.url, {
-					url: item.url,
-					size: item.size,
-					uploadedAt: item.uploadedAt
-				});
-			}
-			hasMore = res.hasMore;
-			cursor = res.cursor;
+	while (hasMore) {
+		const options: { prefix: string; cursor?: string; oidcToken?: string; storeId?: string } = {
+			prefix: 'receipts/',
+			oidcToken: env.VERCEL_OIDC_TOKEN,
+			storeId: env.BLOB_STORE_ID
+		};
+		if (cursor) {
+			options.cursor = cursor;
 		}
+		const res = await list(options);
+		for (const item of res.blobs) {
+			blobs.push({
+				url: item.url,
+				size: item.size,
+				uploadedAt: item.uploadedAt
+			});
+		}
+		hasMore = res.hasMore;
+		cursor = res.cursor;
 	}
 
-	return Array.from(blobMap.values());
+	return blobs;
 }
 
 export async function getBlobStorageUsage() {
@@ -51,7 +46,8 @@ export async function getBlobStorageUsage() {
 		const totalBytes = blobs.reduce((sum, b) => sum + b.size, 0);
 		const blobCount = blobs.length;
 		return { totalBytes, blobCount, blobs };
-	} catch {
+	} catch (err) {
+		logger.error('Failed to list blob storage usage', { error: err });
 		return { totalBytes: 0, blobCount: 0, blobs: [] };
 	}
 }
@@ -60,7 +56,7 @@ export async function purgeStorageQuotaIfNeeded(thresholdBytes = 999 * 1024 * 10
 	const { totalBytes, blobs } = await getBlobStorageUsage();
 
 	if (totalBytes < thresholdBytes) {
-		return { purgedCount: 0, freedBytes: 0, remainingBytes: totalBytes };
+		return { purgedCount: 0, freedBytes: 0, remainingBytes: totalBytes, remainingBlobCount: blobs.length };
 	}
 
 	// Sort blobs by uploadedAt ascending (oldest first)
@@ -88,12 +84,17 @@ export async function purgeStorageQuotaIfNeeded(thresholdBytes = 999 * 1024 * 10
 			currentTotal -= blob.size;
 			freedBytes += blob.size;
 			purgedCount++;
-		} catch {
-			// Skip individual blob failure and continue
+		} catch (err) {
+			logger.warn('Failed to purge blob during quota enforcement', { url: blob.url, error: err });
 		}
 	}
 
-	return { purgedCount, freedBytes, remainingBytes: currentTotal };
+	return {
+		purgedCount,
+		freedBytes,
+		remainingBytes: currentTotal,
+		remainingBlobCount: sortedBlobs.length - purgedCount
+	};
 }
 
 export async function recordStorageSnapshot(totalBytes: number, blobCount: number) {
@@ -103,7 +104,8 @@ export async function recordStorageSnapshot(totalBytes: number, blobCount: numbe
 			.values({ total_bytes: totalBytes, blob_count: blobCount })
 			.returning();
 		return snapshot;
-	} catch {
+	} catch (err) {
+		logger.error('Failed to record storage usage snapshot', { error: err });
 		return null;
 	}
 }
@@ -116,7 +118,8 @@ export async function getLatestStorageSnapshot() {
 			.orderBy(desc(storageUsage.id))
 			.limit(1);
 		return latest ?? null;
-	} catch {
+	} catch (err) {
+		logger.error('Failed to read latest storage usage snapshot', { error: err });
 		return null;
 	}
 }
