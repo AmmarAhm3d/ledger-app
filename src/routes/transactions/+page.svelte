@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { Paperclip, Trash2 } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { Paperclip, Search, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
 	import type { ActionData, PageData } from './$types';
 
@@ -24,6 +26,45 @@
 		else next.add(id);
 		selectedIds = next;
 	}
+
+	let searchInput = $state('');
+	let searchDebounce: ReturnType<typeof setTimeout> | undefined;
+
+	$effect(() => {
+		searchInput = data.filters.search;
+	});
+
+	function updateParams(updates: Record<string, string | null>, resetPage = true) {
+		const params = new URLSearchParams(page.url.searchParams);
+		for (const [key, value] of Object.entries(updates)) {
+			if (value === null || value === '') params.delete(key);
+			else params.set(key, value);
+		}
+		if (resetPage) params.delete('page');
+		goto(`?${params.toString()}`, { keepFocus: true, noScroll: true });
+	}
+
+	function onSearchInput() {
+		clearTimeout(searchDebounce);
+		searchDebounce = setTimeout(() => {
+			updateParams({ search: searchInput.trim() || null });
+		}, 350);
+	}
+
+	function onCategoryChange(e: Event & { currentTarget: HTMLSelectElement }) {
+		updateParams({ category: e.currentTarget.value || null });
+	}
+
+	function goToPage(targetPage: number) {
+		updateParams({ page: targetPage > 1 ? String(targetPage) : null }, false);
+	}
+
+	let rangeStart = $derived(
+		data.pagination.totalCount === 0 ? 0 : (data.pagination.page - 1) * data.pagination.limit + 1
+	);
+	let rangeEnd = $derived(
+		Math.min(data.pagination.page * data.pagination.limit, data.pagination.totalCount)
+	);
 </script>
 
 <section class="rounded-[13px] border border-border bg-panel overflow-hidden">
@@ -59,6 +100,38 @@
 				</button>
 			</form>
 		{/if}
+	</div>
+
+	<div
+		class="flex flex-col gap-2.5 border-b border-border px-4.5 py-3 sm:flex-row sm:items-center"
+	>
+		<div class="relative flex-1 sm:max-w-xs">
+			<Search
+				size={14}
+				strokeWidth={2}
+				class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted"
+			/>
+			<input
+				type="search"
+				placeholder="Search descriptions..."
+				value={searchInput}
+				oninput={(e) => {
+					searchInput = e.currentTarget.value;
+					onSearchInput();
+				}}
+				class="w-full rounded-[9px] border border-border bg-panel-2 py-1.5 pr-2.5 pl-8 text-[12.5px] text-ink outline-none focus:border-accent"
+			/>
+		</div>
+		<select
+			value={data.filters.category ?? ''}
+			onchange={onCategoryChange}
+			class="rounded-[9px] border border-border bg-panel-2 px-2.5 py-1.5 text-[12.5px] text-dim outline-none focus:border-accent"
+		>
+			<option value="">All categories</option>
+			{#each data.categories as category (category.id)}
+				<option value={category.id}>{category.name}</option>
+			{/each}
+		</select>
 	</div>
 
 	{#if form?.message}
@@ -182,6 +255,39 @@
 			{:else}
 				<div class="px-4.5 py-8 text-center text-[12.5px] text-muted">No transactions yet.</div>
 			{/each}
+		</div>
+	</div>
+
+	<div
+		class="flex flex-col gap-2.5 border-t border-border px-4.5 py-3 sm:flex-row sm:items-center sm:justify-between"
+	>
+		<div class="text-[12px] text-muted">
+			{#if data.pagination.totalCount > 0}
+				Showing {rangeStart}&ndash;{rangeEnd} of {data.pagination.totalCount}
+			{:else}
+				No transactions
+			{/if}
+		</div>
+		<div class="flex items-center gap-2">
+			<button
+				type="button"
+				disabled={!data.pagination.hasPrev}
+				onclick={() => goToPage(data.pagination.page - 1)}
+				class="rounded-[9px] border border-border bg-panel-2 px-3 py-1.5 text-[12.5px] font-semibold text-dim transition-colors duration-100 hover:bg-panel-hover disabled:cursor-not-allowed disabled:opacity-40"
+			>
+				Previous
+			</button>
+			<span class="font-mono text-[12px] text-muted">
+				Page {data.pagination.page} of {data.pagination.totalPages}
+			</span>
+			<button
+				type="button"
+				disabled={!data.pagination.hasNext}
+				onclick={() => goToPage(data.pagination.page + 1)}
+				class="rounded-[9px] border border-border bg-panel-2 px-3 py-1.5 text-[12.5px] font-semibold text-dim transition-colors duration-100 hover:bg-panel-hover disabled:cursor-not-allowed disabled:opacity-40"
+			>
+				Next
+			</button>
 		</div>
 	</div>
 </section>
