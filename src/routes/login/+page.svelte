@@ -1,7 +1,12 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
 
-	let error = $state('');
+	let error = $state(
+		page.url.searchParams.get('error') === 'unauthorized'
+			? 'This account is not authorized to access this dashboard.'
+			: ''
+	);
 	let loading = $state(false);
 
 	async function signInWithGitHub() {
