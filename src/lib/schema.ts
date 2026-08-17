@@ -54,6 +54,13 @@ export const updateAccountBalanceSchema = z.object({
 });
 export type UpdateAccountBalanceInput = z.infer<typeof updateAccountBalanceSchema>;
 
+export const updateAccountSchema = z.object({
+	id: positiveIntId('Invalid account id'),
+	name: requiredText('Account name is required'),
+	type: accountType('Invalid account type')
+});
+export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
+
 // ---- Categories ----
 
 export const addCategorySchema = z.object({

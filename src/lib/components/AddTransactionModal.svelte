@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Paperclip, Import } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { pending } from '$lib/pending.svelte';
 	import type { Account, Category } from '$lib/types';
 
 	interface Props {
@@ -122,6 +123,7 @@
 				class="flex flex-col gap-3.75"
 				use:enhance={() => {
 					submitting = true;
+					pending.start('transactions');
 					return async ({ result, update }) => {
 						submitting = false;
 						errorMessage =
@@ -135,6 +137,7 @@
 							onClose();
 						}
 						await update();
+						pending.end('transactions');
 					};
 				}}
 			>

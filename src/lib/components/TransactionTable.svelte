@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { Paperclip } from '@lucide/svelte';
 	import { formatPKR, initials } from '$lib/format';
+	import { pending } from '$lib/pending.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import type { Transaction } from '$lib/types';
 
 	interface Props {
@@ -46,6 +48,23 @@
 				<div>Audit</div>
 				<div class="text-right">Amount</div>
 			</div>
+			{#if pending.isPending('transactions')}
+				<div
+					class="grid grid-cols-[minmax(0,2.2fr)_1.1fr_0.9fr_0.7fr_1fr] items-center gap-3 border-b border-panel-hover px-4.5 py-3"
+				>
+					<div class="flex min-w-0 items-center gap-2.5">
+						<Skeleton width="1.875rem" height="1.875rem" class="rounded-lg" />
+						<div class="flex min-w-0 flex-1 flex-col gap-1.5">
+							<Skeleton width="60%" height="0.8rem" />
+							<Skeleton width="40%" height="0.7rem" />
+						</div>
+					</div>
+					<Skeleton width="4rem" height="1.2rem" />
+					<Skeleton width="3.5rem" height="0.75rem" />
+					<Skeleton width="3rem" height="1.2rem" />
+					<Skeleton width="3.5rem" height="0.8rem" class="ml-auto" />
+				</div>
+			{/if}
 			{#each rows as tx (tx.name + tx.date + tx.account + tx.amount)}
 				<div
 					class="grid grid-cols-[minmax(0,2.2fr)_1.1fr_0.9fr_0.7fr_1fr] items-center gap-3 border-b border-panel-hover px-4.5 py-3 transition-colors duration-100 hover:bg-panel-2"

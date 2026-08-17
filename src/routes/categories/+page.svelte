@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { Plus, Trash2 } from '@lucide/svelte';
+	import { pending } from '$lib/pending.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	let newName = $state('');
 	let newCap = $state('');
+	let savingIds = $state(new Set<number>());
 </script>
 
 <section class="rounded-[13px] border border-border bg-panel p-5">
@@ -24,16 +27,33 @@
 	{/if}
 
 	<div class="flex flex-col gap-2">
+		{#if pending.isPending('categories')}
+			<div
+				class="flex items-center gap-2.5 rounded-[10px] border border-border-strong bg-panel-2 px-2.5 py-2.25"
+			>
+				<div class="min-w-0 flex-1">
+					<Skeleton width="50%" height="0.85rem" />
+					<div class="mt-1.5"><Skeleton width="30%" height="0.65rem" /></div>
+				</div>
+				<Skeleton width="6.875rem" height="1.5rem" />
+			</div>
+		{/if}
 		{#each data.categories as category (category.id)}
 			<div
 				class="flex items-center gap-2.5 rounded-[10px] border border-border-strong bg-panel-2 px-2.5 py-2.25"
+				class:opacity-50={savingIds.has(category.id)}
+				class:pointer-events-none={savingIds.has(category.id)}
 			>
 				<form
 					method="POST"
 					action="?/updateCategory"
 					use:enhance={() => {
+						savingIds = new Set(savingIds).add(category.id);
 						return async ({ update }) => {
 							await update({ reset: false });
+							const next = new Set(savingIds);
+							next.delete(category.id);
+							savingIds = next;
 						};
 					}}
 					class="flex min-w-0 flex-1 items-center gap-2.5"
@@ -77,10 +97,12 @@
 		method="POST"
 		action="?/addCategory"
 		use:enhance={() => {
+			pending.start('categories');
 			return async ({ update }) => {
 				await update();
 				newName = '';
 				newCap = '';
+				pending.end('categories');
 			};
 		}}
 		class="mt-4 flex flex-col gap-2.5 border-t border-border pt-4 sm:max-w-100"

@@ -2,6 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { formatPKR, initials } from '$lib/format';
+	import { pending } from '$lib/pending.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
+	import { ACCOUNT_TYPES } from '$lib/schema';
 	import type { Account, AccountType } from '$lib/types';
 
 	interface Props {
@@ -16,6 +19,7 @@
 	let newType = $state<AccountType>('Bank');
 	let newAmount = $state('');
 	let errorMessage = $state('');
+	let savingIds = $state(new Set<number>());
 
 	function handleResult(result: { type: string; data?: Record<string, unknown> }) {
 		errorMessage = result.type === 'failure' ? String(result.data?.message ?? 'Something went wrong') : '';
@@ -55,26 +59,73 @@
 			{/if}
 
 			<div class="flex flex-col gap-2">
+				{#if pending.isPending('accounts')}
+					<div
+						class="flex items-center gap-2.5 rounded-[10px] border border-border-strong bg-panel px-2.5 py-2.25"
+					>
+						<Skeleton width="1.875rem" height="1.875rem" class="rounded-lg" />
+						<div class="min-w-0 flex-1">
+							<Skeleton width="55%" height="0.8rem" />
+							<div class="mt-1.5"><Skeleton width="35%" height="0.65rem" /></div>
+						</div>
+						<Skeleton width="6.875rem" height="1.5rem" />
+					</div>
+				{/if}
 				{#each accounts as account (account.id)}
 					<div
 						class="flex items-center gap-2.5 rounded-[10px] border border-border-strong bg-panel px-2.5 py-2.25"
+						class:opacity-50={savingIds.has(account.id)}
+						class:pointer-events-none={savingIds.has(account.id)}
 					>
 						<div
 							class="flex h-7.5 w-7.5 flex-none items-center justify-center rounded-lg bg-panel-strong text-[11px] font-semibold text-accent-hover"
 						>
 							{initials(account.name)}
 						</div>
-						<div class="min-w-0 flex-1">
-							<div class="truncate text-[12.5px] font-semibold">{account.name}</div>
-							<div class="text-[11px] text-muted">{account.type}</div>
-						</div>
+						<form
+							method="POST"
+							action="/?/updateAccount"
+							use:enhance={() => {
+								savingIds = new Set(savingIds).add(account.id);
+								return async ({ result, update }) => {
+									handleResult(result);
+									await update({ reset: false });
+									const next = new Set(savingIds);
+									next.delete(account.id);
+									savingIds = next;
+								};
+							}}
+							class="min-w-0 flex-1"
+						>
+							<input type="hidden" name="id" value={account.id} />
+							<input
+								name="name"
+								value={account.name}
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								class="w-full truncate rounded-lg border border-transparent bg-transparent px-0 py-0 text-[12.5px] font-semibold text-ink outline-none focus:border-accent focus:bg-panel-2 focus:px-2 focus:py-1"
+							/>
+							<select
+								name="type"
+								value={account.type}
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								class="mt-0.5 w-full rounded-lg border border-transparent bg-transparent px-0 py-0 text-[11px] text-muted outline-none focus:border-accent focus:bg-panel-2 focus:px-2 focus:py-1"
+							>
+								{#each ACCOUNT_TYPES as type (type)}
+									<option value={type}>{type}</option>
+								{/each}
+							</select>
+						</form>
 						<form
 						method="POST"
 						action="/?/updateAccountBalance"
 						use:enhance={() => {
+							savingIds = new Set(savingIds).add(account.id);
 							return async ({ result, update }) => {
 								handleResult(result);
 								await update({ reset: false });
+								const next = new Set(savingIds);
+								next.delete(account.id);
+								savingIds = next;
 							};
 						}}
 					>
@@ -118,9 +169,11 @@
 				method="POST"
 				action="/?/addAccount"
 				use:enhance={() => {
+					pending.start('accounts');
 					return async ({ result, update }) => {
 						handleResult(result);
 						await update();
+						pending.end('accounts');
 						if (result.type === 'success') {
 							newName = '';
 							newAmount = '';

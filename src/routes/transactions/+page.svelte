@@ -4,6 +4,8 @@
 	import { page } from '$app/state';
 	import { Paperclip, Repeat, Search, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
+	import { pending } from '$lib/pending.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -12,6 +14,7 @@
 
 	let selectedIds = $state(new Set<number>());
 	let deleting = $state(false);
+	let savingIds = $state(new Set<number>());
 
 	let selectableIds = $derived(data.transactions.filter((tx) => !tx.is_transfer).map((tx) => tx.id));
 	let allSelected = $derived(
@@ -199,6 +202,19 @@
 				<div class="text-right">Amount</div>
 			</div>
 
+			{#if pending.isPending('transactions')}
+				<div
+					class="grid grid-cols-[28px_minmax(0,1.8fr)_1fr_1fr_0.9fr_0.7fr_1fr] items-center gap-3 border-b border-panel-hover px-4.5 py-3"
+				>
+					<div></div>
+					<Skeleton width="70%" height="0.85rem" />
+					<Skeleton width="60%" height="0.75rem" />
+					<Skeleton width="50%" height="0.75rem" />
+					<Skeleton width="4rem" height="0.75rem" />
+					<div></div>
+					<Skeleton width="3.5rem" height="0.85rem" class="ml-auto" />
+				</div>
+			{/if}
 			{#each data.transactions as tx (tx.id)}
 				{#if tx.is_transfer}
 					<div
@@ -229,11 +245,17 @@
 						method="POST"
 						action="?/updateTransaction"
 						use:enhance={() => {
+							savingIds = new Set(savingIds).add(tx.id);
 							return async ({ update }) => {
 								await update({ reset: false });
+								const next = new Set(savingIds);
+								next.delete(tx.id);
+								savingIds = next;
 							};
 						}}
 						class="grid grid-cols-[28px_minmax(0,1.8fr)_1fr_1fr_0.9fr_0.7fr_1fr] items-center gap-3 border-b border-panel-hover px-4.5 py-2 transition-colors duration-100 hover:bg-panel-2"
+						class:opacity-50={savingIds.has(tx.id)}
+						class:pointer-events-none={savingIds.has(tx.id)}
 					>
 						<input type="hidden" name="id" value={tx.id} />
 						<input type="hidden" name="transaction_id" value={tx.id} />

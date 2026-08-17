@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import { put } from '@vercel/blob';
 import { env } from '$env/dynamic/private';
 import { db } from '$lib/server/db';
@@ -16,7 +16,8 @@ import {
 	receiptFileSchema,
 	removeAccountSchema,
 	transferSchema,
-	updateAccountBalanceSchema
+	updateAccountBalanceSchema,
+	updateAccountSchema
 } from '$lib/schema';
 import { parseAndValidateBulkImport } from '$lib/bulk-import';
 import { getDueSubscriptions } from '$lib/server/subscriptions';
@@ -30,6 +31,16 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
 	const userId = locals.user.id;
 	const { categories: categoryRows } = await parent();
+
+	const now = new Date();
+	const currentMonthPrefix = now.toISOString().slice(0, 7);
+	const today = new Date(now.toISOString().slice(0, 10));
+
+	const [currentYear, currentMonth] = currentMonthPrefix.split('-').map(Number);
+	const previousMonthPrefix =
+		currentMonth === 1
+			? `${currentYear - 1}-12`
+			: `${currentYear}-${String(currentMonth - 1).padStart(2, '0')}`;
 
 	const transactionRows = await db
 		.select({
@@ -48,18 +59,14 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		.from(transactions)
 		.innerJoin(accounts, eq(transactions.account_id, accounts.id))
 		.leftJoin(categories, eq(transactions.category_id, categories.id))
-		.where(and(eq(transactions.user_id, userId), isNull(transactions.deleted_at)))
+		.where(
+			and(
+				eq(transactions.user_id, userId),
+				isNull(transactions.deleted_at),
+				gte(transactions.date, `${previousMonthPrefix}-01`)
+			)
+		)
 		.orderBy(desc(transactions.date), desc(transactions.id));
-
-	const now = new Date();
-	const currentMonthPrefix = now.toISOString().slice(0, 7);
-	const today = new Date(now.toISOString().slice(0, 10));
-
-	const [currentYear, currentMonth] = currentMonthPrefix.split('-').map(Number);
-	const previousMonthPrefix =
-		currentMonth === 1
-			? `${currentYear - 1}-12`
-			: `${currentYear}-${String(currentMonth - 1).padStart(2, '0')}`;
 
 	let monthlyIncome = 0;
 	let monthlyExpenses = 0;
@@ -124,7 +131,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 	return {
 		title: 'Overview',
 		subtitle: 'Synced just now',
-		transactions: transactionRows,
+		transactions: transactionRows.slice(0, 10),
 		suggestedTransactions,
 		monthlyIncome,
 		monthlyExpenses,
@@ -297,6 +304,57 @@ export const actions: Actions = {
 				accountId: id,
 				error
 			});
+			throw error;
+		}
+	},
+
+	updateAccount: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const form = await request.formData();
+
+		const result = validate(updateAccountSchema, {
+			id: parseId(form.get('id')),
+			name: form.get('name')?.toString() ?? '',
+			type: form.get('type')?.toString() ?? ''
+		});
+		if (!result.success) {
+			logger.warn('updateAccount validation failed', { userId: locals.user.id, error: result.error });
+			return fail(400, { message: result.error });
+		}
+		const { id, name, type } = result.data;
+
+		try {
+			await db.transaction(async (tx) => {
+				const [existing] = await tx
+					.select()
+					.from(accounts)
+					.where(
+						and(
+							eq(accounts.id, id),
+							eq(accounts.user_id, locals.user!.id),
+							isNull(accounts.deleted_at)
+						)
+					);
+				if (!existing) return;
+
+				const [updated] = await tx
+					.update(accounts)
+					.set({ name, type })
+					.where(and(eq(accounts.id, id), eq(accounts.user_id, locals.user!.id)))
+					.returning();
+
+				await logAudit(tx, {
+					userId: locals.user!.id,
+					entityType: 'account',
+					entityId: id,
+					action: 'update',
+					oldValues: existing,
+					newValues: updated
+				});
+			});
+			logger.info('Account updated', { userId: locals.user.id, accountId: id });
+		} catch (error) {
+			logger.error('Failed to update account', { userId: locals.user.id, accountId: id, error });
 			throw error;
 		}
 	},
