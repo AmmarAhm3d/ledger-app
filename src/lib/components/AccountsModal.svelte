@@ -100,6 +100,7 @@
 							<input type="hidden" name="id" value={account.id} />
 							<input
 								name="name"
+								required
 								value={account.name}
 								onchange={(e) => e.currentTarget.form?.requestSubmit()}
 								class="w-full truncate rounded-lg border border-transparent bg-transparent px-0 py-0 text-[12.5px] font-semibold text-ink outline-none focus:border-accent focus:bg-panel-2 focus:px-2 focus:py-1"
@@ -132,6 +133,8 @@
 							<input type="hidden" name="id" value={account.id} />
 							<input
 								name="balance"
+								type="number"
+								step="0.01"
 								value={String(account.balance)}
 								onchange={(e) => e.currentTarget.form?.requestSubmit()}
 								class="w-27.5 rounded-lg border border-border-strong bg-panel-2 px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
@@ -187,6 +190,7 @@
 				<div class="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.3fr_1fr]">
 					<input
 						name="name"
+						required
 						bind:value={newName}
 						placeholder="e.g. Meezan Bank"
 						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
@@ -196,13 +200,16 @@
 						bind:value={newType}
 						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none"
 					>
-						<option value="Bank">Bank</option>
-						<option value="Microfinance / Wallet">Microfinance / Wallet</option>
-						<option value="Cash">Cash</option>
+						{#each ACCOUNT_TYPES as type (type)}
+							<option value={type}>{type}</option>
+						{/each}
 					</select>
 				</div>
 				<input
 					name="balance"
+					type="number"
+					step="0.01"
+					required
 					bind:value={newAmount}
 					placeholder="Rs 0"
 					class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"

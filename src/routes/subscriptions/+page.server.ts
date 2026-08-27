@@ -2,14 +2,21 @@ import { error, fail } from '@sveltejs/kit';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, categories, recurringSubscriptions, transactions } from '$lib/server/db/schema';
-import { parseAmount, parseId } from '$lib/server/form-utils';
+import { parseAmount, parseId, parseOptionalId } from '$lib/server/form-utils';
 import { logger } from '$lib/server/logger';
 import { logAudit } from '$lib/server/audit';
+import { validate } from '$lib/server/result';
+import {
+	addSubscriptionSchema,
+	confirmSubscriptionPaymentSchema,
+	createSubscriptionFromTransactionSchema,
+	removeSubscriptionSchema,
+	updateSubscriptionSchema
+} from '$lib/schema';
 import {
 	advanceDate,
 	isOwnedAccount,
-	isOwnedCategory,
-	parseCadence
+	isOwnedCategory
 } from '$lib/server/subscriptions';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -69,24 +76,22 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 
-		const name = String(form.get('name') ?? '').trim();
-		const amount = parseAmount(form.get('amount'));
-		const cadence = parseCadence(form.get('cadence'));
-		const nextDueDate = String(form.get('next_due_date') ?? '').trim();
-		const categoryId = parseId(form.get('category_id'));
-		const accountId = parseId(form.get('account_id'));
+		const result = validate(addSubscriptionSchema, {
+			name: form.get('name'),
+			amount: parseAmount(form.get('amount')),
+			cadence: form.get('cadence'),
+			next_due_date: form.get('next_due_date'),
+			category_id: parseOptionalId(form.get('category_id')),
+			account_id: parseOptionalId(form.get('account_id'))
+		});
+		if (!result.success) return fail(400, { message: result.error });
 
-		if (!name) return fail(400, { message: 'Subscription name is required' });
-		if (!Number.isFinite(amount) || amount <= 0) {
-			return fail(400, { message: 'Amount must be a positive number' });
-		}
-		if (!cadence) return fail(400, { message: 'Invalid cadence' });
-		if (!nextDueDate) return fail(400, { message: 'Next due date is required' });
+		const { name, amount, cadence, next_due_date, category_id, account_id } = result.data;
 
-		if (!Number.isNaN(categoryId) && !(await isOwnedCategory(locals.user.id, categoryId))) {
+		if (category_id !== null && !(await isOwnedCategory(locals.user.id, category_id))) {
 			return fail(400, { message: 'Invalid category' });
 		}
-		if (!Number.isNaN(accountId) && !(await isOwnedAccount(locals.user.id, accountId))) {
+		if (account_id !== null && !(await isOwnedAccount(locals.user.id, account_id))) {
 			return fail(400, { message: 'Invalid account' });
 		}
 
@@ -94,9 +99,9 @@ export const actions: Actions = {
 			name,
 			amount,
 			cadence,
-			next_due_date: nextDueDate,
-			category_id: Number.isNaN(categoryId) ? null : categoryId,
-			account_id: Number.isNaN(accountId) ? null : accountId,
+			next_due_date,
+			category_id,
+			account_id,
 			user_id: locals.user.id
 		});
 	},
@@ -105,27 +110,25 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 
-		const id = parseId(form.get('id'));
-		const name = String(form.get('name') ?? '').trim();
-		const amount = parseAmount(form.get('amount'));
-		const cadence = parseCadence(form.get('cadence'));
-		const nextDueDate = String(form.get('next_due_date') ?? '').trim();
-		const categoryId = parseId(form.get('category_id'));
-		const accountId = parseId(form.get('account_id'));
-		const isActive = form.get('is_active') != null;
+		const result = validate(updateSubscriptionSchema, {
+			id: parseId(form.get('id')),
+			name: form.get('name'),
+			amount: parseAmount(form.get('amount')),
+			cadence: form.get('cadence'),
+			next_due_date: form.get('next_due_date'),
+			category_id: parseOptionalId(form.get('category_id')),
+			account_id: parseOptionalId(form.get('account_id')),
+			is_active: form.get('is_active') != null
+		});
+		if (!result.success) return fail(400, { message: result.error });
 
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid subscription id' });
-		if (!name) return fail(400, { message: 'Subscription name is required' });
-		if (!Number.isFinite(amount) || amount <= 0) {
-			return fail(400, { message: 'Amount must be a positive number' });
-		}
-		if (!cadence) return fail(400, { message: 'Invalid cadence' });
-		if (!nextDueDate) return fail(400, { message: 'Next due date is required' });
+		const { id, name, amount, cadence, next_due_date, category_id, account_id, is_active } =
+			result.data;
 
-		if (!Number.isNaN(categoryId) && !(await isOwnedCategory(locals.user.id, categoryId))) {
+		if (category_id !== null && !(await isOwnedCategory(locals.user.id, category_id))) {
 			return fail(400, { message: 'Invalid category' });
 		}
-		if (!Number.isNaN(accountId) && !(await isOwnedAccount(locals.user.id, accountId))) {
+		if (account_id !== null && !(await isOwnedAccount(locals.user.id, account_id))) {
 			return fail(400, { message: 'Invalid account' });
 		}
 
@@ -135,10 +138,10 @@ export const actions: Actions = {
 				name,
 				amount,
 				cadence,
-				next_due_date: nextDueDate,
-				category_id: Number.isNaN(categoryId) ? null : categoryId,
-				account_id: Number.isNaN(accountId) ? null : accountId,
-				is_active: isActive
+				next_due_date,
+				category_id,
+				account_id,
+				is_active
 			})
 			.where(
 				and(eq(recurringSubscriptions.id, id), eq(recurringSubscriptions.user_id, locals.user.id))
@@ -148,13 +151,19 @@ export const actions: Actions = {
 	removeSubscription: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid subscription id' });
+
+		const result = validate(removeSubscriptionSchema, {
+			id: parseId(form.get('id'))
+		});
+		if (!result.success) return fail(400, { message: result.error });
 
 		await db
 			.delete(recurringSubscriptions)
 			.where(
-				and(eq(recurringSubscriptions.id, id), eq(recurringSubscriptions.user_id, locals.user.id))
+				and(
+					eq(recurringSubscriptions.id, result.data.id),
+					eq(recurringSubscriptions.user_id, locals.user.id)
+				)
 			);
 	},
 
@@ -168,15 +177,21 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const userId = locals.user.id;
 		const form = await request.formData();
-		const transactionId = parseId(form.get('transaction_id'));
-		if (Number.isNaN(transactionId)) return fail(400, { message: 'Invalid transaction' });
+
+		const result = validate(createSubscriptionFromTransactionSchema, {
+			transaction_id: parseId(form.get('transaction_id')),
+			cadence: form.get('cadence') ?? 'monthly'
+		});
+		if (!result.success) return fail(400, { message: result.error });
+
+		const { transaction_id, cadence } = result.data;
 
 		const [tx] = await db
 			.select()
 			.from(transactions)
 			.where(
 				and(
-					eq(transactions.id, transactionId),
+					eq(transactions.id, transaction_id),
 					eq(transactions.user_id, userId),
 					eq(transactions.is_transfer, false),
 					isNull(transactions.deleted_at)
@@ -187,10 +202,8 @@ export const actions: Actions = {
 		const [already] = await db
 			.select({ id: recurringSubscriptions.id })
 			.from(recurringSubscriptions)
-			.where(eq(recurringSubscriptions.source_transaction_id, transactionId));
+			.where(eq(recurringSubscriptions.source_transaction_id, transaction_id));
 		if (already) return fail(400, { message: 'Already tracked as a subscription' });
-
-		const cadence = parseCadence(form.get('cadence')) ?? 'monthly';
 
 		await db.insert(recurringSubscriptions).values({
 			name: tx.description ?? 'Subscription',
@@ -214,8 +227,13 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const userId = locals.user.id;
 		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid subscription id' });
+
+		const result = validate(confirmSubscriptionPaymentSchema, {
+			id: parseId(form.get('id'))
+		});
+		if (!result.success) return fail(400, { message: result.error });
+
+		const id = result.data.id;
 
 		const [sub] = await db
 			.select()

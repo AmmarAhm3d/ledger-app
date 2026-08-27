@@ -1,4 +1,6 @@
-export type AccountType = 'Bank' | 'Microfinance / Wallet' | 'Cash';
+import type { AccountTypeValue } from './schema';
+
+export type AccountType = AccountTypeValue;
 
 export interface Account {
 	id: number;

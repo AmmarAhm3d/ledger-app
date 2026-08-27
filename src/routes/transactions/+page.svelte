@@ -295,6 +295,7 @@
 						<input
 							name="date"
 							type="date"
+							required
 							value={tx.date}
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 font-mono text-xs text-muted outline-none focus:border-accent focus:bg-panel"
@@ -327,6 +328,7 @@
 							name="amount"
 							type="number"
 							step="0.01"
+							required
 							value={tx.amount}
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="w-full rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 text-right font-mono text-[13px] font-medium outline-none focus:border-accent focus:bg-panel"

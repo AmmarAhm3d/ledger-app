@@ -2,6 +2,7 @@
 	import { Paperclip, Import } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
 	import { pending } from '$lib/pending.svelte';
+	import { ALLOWED_RECEIPT_TYPES, MAX_RECEIPT_BYTES } from '$lib/schema';
 	import type { Account, Category } from '$lib/types';
 
 	interface Props {
@@ -29,9 +30,6 @@
 		return `${year}-${month}-${day}`;
 	}
 
-	const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
-	const ALLOWED_RECEIPT_TYPES = ['image/png', 'image/jpeg', 'application/pdf'];
-
 	function handleFileChange(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
 		const file = input.files?.[0];
@@ -41,14 +39,14 @@
 			return;
 		}
 
-		if (file.size >= MAX_RECEIPT_BYTES) {
+		if (file.size > MAX_RECEIPT_BYTES) {
 			input.value = '';
 			receiptFileName = '';
-			alert('Receipt must be smaller than 5 MB');
+			alert('Receipt must be smaller than 10 MB');
 			return;
 		}
 
-		if (!ALLOWED_RECEIPT_TYPES.includes(file.type)) {
+		if (!(file.type in ALLOWED_RECEIPT_TYPES)) {
 			input.value = '';
 			receiptFileName = '';
 			alert('Receipt must be a PNG, JPEG, or PDF file');
@@ -186,6 +184,7 @@
 							name="amount"
 							type="number"
 							step="0.01"
+							min="0.01"
 							required
 							placeholder="0.00"
 							class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"

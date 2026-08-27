@@ -47,11 +47,12 @@
 					<input type="hidden" name="id" value={goal.id} />
 					<div class="min-w-0 flex-1">
 						<input
-							name="name"
-							value={goal.name}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="w-full truncate rounded-lg border border-transparent bg-transparent px-0 py-0 text-[13px] font-semibold text-ink outline-none focus:border-accent focus:bg-panel focus:px-2 focus:py-1.5"
-						/>
+						name="name"
+						required
+						value={goal.name}
+						onchange={(e) => e.currentTarget.form?.requestSubmit()}
+						class="w-full truncate rounded-lg border border-transparent bg-transparent px-0 py-0 text-[13px] font-semibold text-ink outline-none focus:border-accent focus:bg-panel focus:px-2 focus:py-1.5"
+					/>
 						<div class="text-[11px] text-muted">
 							{goal.account_name ?? 'No linked account'}{goal.target_date
 								? ` · target ${goal.target_date}`
@@ -80,6 +81,7 @@
 						name="current_amount"
 						type="number"
 						step="0.01"
+						min="0"
 						value={goal.current_amount}
 						onchange={(e) => e.currentTarget.form?.requestSubmit()}
 						title="Current amount saved"
@@ -90,6 +92,8 @@
 						name="target_amount"
 						type="number"
 						step="0.01"
+						min="0.01"
+						required
 						value={goal.target_amount}
 						onchange={(e) => e.currentTarget.form?.requestSubmit()}
 						title="Target amount"
@@ -149,6 +153,7 @@
 		<div class="text-[12.5px] font-semibold">Add savings goal</div>
 		<input
 			name="name"
+			required
 			bind:value={newName}
 			placeholder="e.g. Emergency fund"
 			class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
@@ -156,12 +161,19 @@
 		<div class="flex gap-2.5">
 			<input
 				name="current_amount"
+				type="number"
+				step="0.01"
+				min="0"
 				bind:value={newCurrentAmount}
 				placeholder="Current amount (Rs 0)"
 				class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
 			/>
 			<input
 				name="target_amount"
+				type="number"
+				step="0.01"
+				min="0.01"
+				required
 				bind:value={newTargetAmount}
 				placeholder="Target amount"
 				class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"

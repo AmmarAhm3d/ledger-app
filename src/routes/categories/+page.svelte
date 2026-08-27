@@ -62,6 +62,7 @@
 					<div class="min-w-0 flex-1">
 						<input
 							name="name"
+							required
 							value={category.name}
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="w-full truncate rounded-lg border border-transparent bg-transparent px-0 py-0 text-[12.5px] font-semibold text-ink outline-none focus:border-accent focus:bg-panel focus:px-2 focus:py-1.5"
@@ -70,6 +71,9 @@
 					</div>
 					<input
 						name="monthly_cap"
+						type="number"
+						step="0.01"
+						min="0"
 						value={String(category.monthly_cap)}
 						onchange={(e) => e.currentTarget.form?.requestSubmit()}
 						class="w-27.5 rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
@@ -110,12 +114,16 @@
 		<div class="text-[12.5px] font-semibold">Add category</div>
 		<input
 			name="name"
+			required
 			bind:value={newName}
 			placeholder="e.g. Groceries"
 			class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
 		/>
 		<input
 			name="monthly_cap"
+			type="number"
+			step="0.01"
+			min="0"
 			bind:value={newCap}
 			placeholder="Monthly cap (Rs 0)"
 			class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"

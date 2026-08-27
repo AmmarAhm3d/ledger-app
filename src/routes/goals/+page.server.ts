@@ -2,7 +2,9 @@ import { error, fail } from '@sveltejs/kit';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, savingsGoals } from '$lib/server/db/schema';
-import { parseAmount, parseId, parseOptionalAmount } from '$lib/server/form-utils';
+import { parseAmount, parseId, parseOptionalAmount, parseOptionalId } from '$lib/server/form-utils';
+import { validate } from '$lib/server/result';
+import { addGoalSchema, removeGoalSchema, updateGoalSchema } from '$lib/schema';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
@@ -45,25 +47,24 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 
-		const name = String(form.get('name') ?? '').trim();
-		const targetAmount = parseAmount(form.get('target_amount'));
-		const currentAmount = parseOptionalAmount(form.get('current_amount'));
-		const targetDate = String(form.get('target_date') ?? '').trim() || null;
-		const accountId = parseId(form.get('account_id'));
+		const result = validate(addGoalSchema, {
+			name: form.get('name'),
+			target_amount: parseAmount(form.get('target_amount')),
+			current_amount: parseOptionalAmount(form.get('current_amount')),
+			target_date: form.get('target_date'),
+			account_id: parseOptionalId(form.get('account_id'))
+		});
+		if (!result.success) return fail(400, { message: result.error });
 
-		if (!name) return fail(400, { message: 'Goal name is required' });
-		if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
-			return fail(400, { message: 'Target amount must be a positive number' });
-		}
-		if (Number.isNaN(currentAmount)) return fail(400, { message: 'Current amount must be a number' });
+		const { name, target_amount, current_amount, target_date, account_id } = result.data;
 
-		if (!Number.isNaN(accountId)) {
+		if (account_id !== null) {
 			const [owned] = await db
 				.select({ id: accounts.id })
 				.from(accounts)
 				.where(
 					and(
-						eq(accounts.id, accountId),
+						eq(accounts.id, account_id),
 						eq(accounts.user_id, locals.user.id),
 						isNull(accounts.deleted_at)
 					)
@@ -73,10 +74,10 @@ export const actions: Actions = {
 
 		await db.insert(savingsGoals).values({
 			name,
-			target_amount: targetAmount,
-			current_amount: currentAmount,
-			target_date: targetDate,
-			account_id: Number.isNaN(accountId) ? null : accountId,
+			target_amount,
+			current_amount,
+			target_date,
+			account_id,
 			user_id: locals.user.id
 		});
 	},
@@ -85,27 +86,25 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
 
-		const id = parseId(form.get('id'));
-		const name = String(form.get('name') ?? '').trim();
-		const targetAmount = parseAmount(form.get('target_amount'));
-		const currentAmount = parseOptionalAmount(form.get('current_amount'));
-		const targetDate = String(form.get('target_date') ?? '').trim() || null;
-		const accountId = parseId(form.get('account_id'));
+		const result = validate(updateGoalSchema, {
+			id: parseId(form.get('id')),
+			name: form.get('name'),
+			target_amount: parseAmount(form.get('target_amount')),
+			current_amount: parseOptionalAmount(form.get('current_amount')),
+			target_date: form.get('target_date'),
+			account_id: parseOptionalId(form.get('account_id'))
+		});
+		if (!result.success) return fail(400, { message: result.error });
 
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid goal id' });
-		if (!name) return fail(400, { message: 'Goal name is required' });
-		if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
-			return fail(400, { message: 'Target amount must be a positive number' });
-		}
-		if (Number.isNaN(currentAmount)) return fail(400, { message: 'Current amount must be a number' });
+		const { id, name, target_amount, current_amount, target_date, account_id } = result.data;
 
-		if (!Number.isNaN(accountId)) {
+		if (account_id !== null) {
 			const [owned] = await db
 				.select({ id: accounts.id })
 				.from(accounts)
 				.where(
 					and(
-						eq(accounts.id, accountId),
+						eq(accounts.id, account_id),
 						eq(accounts.user_id, locals.user.id),
 						isNull(accounts.deleted_at)
 					)
@@ -117,10 +116,10 @@ export const actions: Actions = {
 			.update(savingsGoals)
 			.set({
 				name,
-				target_amount: targetAmount,
-				current_amount: currentAmount,
-				target_date: targetDate,
-				account_id: Number.isNaN(accountId) ? null : accountId
+				target_amount,
+				current_amount,
+				target_date,
+				account_id
 			})
 			.where(and(eq(savingsGoals.id, id), eq(savingsGoals.user_id, locals.user.id)));
 	},
@@ -128,11 +127,14 @@ export const actions: Actions = {
 	removeGoal: async ({ request, locals }) => {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const form = await request.formData();
-		const id = parseId(form.get('id'));
-		if (Number.isNaN(id)) return fail(400, { message: 'Invalid goal id' });
+
+		const result = validate(removeGoalSchema, {
+			id: parseId(form.get('id'))
+		});
+		if (!result.success) return fail(400, { message: result.error });
 
 		await db
 			.delete(savingsGoals)
-			.where(and(eq(savingsGoals.id, id), eq(savingsGoals.user_id, locals.user.id)));
+			.where(and(eq(savingsGoals.id, result.data.id), eq(savingsGoals.user_id, locals.user.id)));
 	}
 };

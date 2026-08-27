@@ -12,3 +12,9 @@ export function parseId(raw: FormDataEntryValue | null): number {
 	const id = Number(raw);
 	return Number.isInteger(id) && id > 0 ? id : NaN;
 }
+
+export function parseOptionalId(raw: FormDataEntryValue | null): number | null {
+	if (raw == null || String(raw).trim() === '') return null;
+	const id = Number(raw);
+	return Number.isInteger(id) && id > 0 ? id : NaN;
+}

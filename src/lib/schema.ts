@@ -34,6 +34,19 @@ const optionalDescription = z
 		return trimmed === '' ? null : trimmed;
 	});
 
+const optionalPositiveIntId = (message: string) =>
+	z.custom<number | null>(
+		(v) => v === null || (typeof v === 'number' && Number.isInteger(v) && v > 0),
+		message
+	);
+
+const optionalText = z
+	.union([z.string(), z.null(), z.undefined()])
+	.transform((v) => {
+		const trimmed = (v ?? '').toString().trim();
+		return trimmed === '' ? null : trimmed;
+	});
+
 // ---- Accounts ----
 
 export const addAccountSchema = z.object({
@@ -84,7 +97,10 @@ export type RemoveCategoryInput = z.infer<typeof removeCategorySchema>;
 // ---- Transactions ----
 
 export const addTransactionSchema = z.object({
-	amount: finiteNumber('Missing required fields'),
+	amount: finiteNumber('Missing required fields').refine(
+		(n) => n > 0,
+		'Amount must be a positive number'
+	),
 	description: optionalDescription,
 	account_id: positiveIntId('Missing required fields'),
 	category_id: positiveIntId('Missing required fields'),
@@ -125,6 +141,91 @@ export const transferSchema = z
 	});
 export type TransferInput = z.infer<typeof transferSchema>;
 
+// ---- Savings Goals ----
+
+export const addGoalSchema = z.object({
+	name: requiredText('Goal name is required'),
+	target_amount: finiteNumber('Target amount must be a positive number').refine(
+		(n) => n > 0,
+		'Target amount must be a positive number'
+	),
+	current_amount: finiteNumber('Current amount must be a number'),
+	target_date: optionalText,
+	account_id: optionalPositiveIntId('Invalid account')
+});
+export type AddGoalInput = z.infer<typeof addGoalSchema>;
+
+export const updateGoalSchema = z.object({
+	id: positiveIntId('Invalid goal id'),
+	name: requiredText('Goal name is required'),
+	target_amount: finiteNumber('Target amount must be a positive number').refine(
+		(n) => n > 0,
+		'Target amount must be a positive number'
+	),
+	current_amount: finiteNumber('Current amount must be a number'),
+	target_date: optionalText,
+	account_id: optionalPositiveIntId('Invalid account')
+});
+export type UpdateGoalInput = z.infer<typeof updateGoalSchema>;
+
+export const removeGoalSchema = z.object({
+	id: positiveIntId('Invalid goal id')
+});
+export type RemoveGoalInput = z.infer<typeof removeGoalSchema>;
+
+// ---- Subscriptions ----
+
+export const CADENCES = ['weekly', 'monthly', 'yearly'] as const;
+export type CadenceValue = (typeof CADENCES)[number];
+
+export const addSubscriptionSchema = z.object({
+	name: requiredText('Subscription name is required'),
+	amount: finiteNumber('Amount must be a positive number').refine(
+		(n) => n > 0,
+		'Amount must be a positive number'
+	),
+	cadence: z.enum(CADENCES, { message: 'Invalid cadence' }),
+	next_due_date: requiredText('Next due date is required'),
+	category_id: optionalPositiveIntId('Invalid category'),
+	account_id: optionalPositiveIntId('Invalid account')
+});
+export type AddSubscriptionInput = z.infer<typeof addSubscriptionSchema>;
+
+export const updateSubscriptionSchema = z.object({
+	id: positiveIntId('Invalid subscription id'),
+	name: requiredText('Subscription name is required'),
+	amount: finiteNumber('Amount must be a positive number').refine(
+		(n) => n > 0,
+		'Amount must be a positive number'
+	),
+	cadence: z.enum(CADENCES, { message: 'Invalid cadence' }),
+	next_due_date: requiredText('Next due date is required'),
+	category_id: optionalPositiveIntId('Invalid category'),
+	account_id: optionalPositiveIntId('Invalid account'),
+	is_active: z.boolean().default(true)
+});
+export type UpdateSubscriptionInput = z.infer<typeof updateSubscriptionSchema>;
+
+export const removeSubscriptionSchema = z.object({
+	id: positiveIntId('Invalid subscription id')
+});
+export type RemoveSubscriptionInput = z.infer<typeof removeSubscriptionSchema>;
+
+export const createSubscriptionFromTransactionSchema = z.object({
+	transaction_id: positiveIntId('Invalid transaction'),
+	cadence: z.enum(CADENCES, { message: 'Invalid cadence' }).default('monthly')
+});
+export type CreateSubscriptionFromTransactionInput = z.infer<
+	typeof createSubscriptionFromTransactionSchema
+>;
+
+export const confirmSubscriptionPaymentSchema = z.object({
+	id: positiveIntId('Invalid subscription id')
+});
+export type ConfirmSubscriptionPaymentInput = z.infer<
+	typeof confirmSubscriptionPaymentSchema
+>;
+
 // ---- Bulk YAML import ----
 
 export const bulkImportYamlSchema = z.object({
@@ -137,8 +238,6 @@ export type BulkImportYamlInput = z.infer<typeof bulkImportYamlSchema>;
 export const ALLOWED_RECEIPT_TYPES: Record<string, string> = {
 	'image/jpeg': 'jpg',
 	'image/png': 'png',
-	'image/webp': 'webp',
-	'image/heic': 'heic',
 	'application/pdf': 'pdf'
 };
 
@@ -147,6 +246,6 @@ export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 export const receiptFileSchema = z
 	.instanceof(File)
 	.refine((f) => f.type in ALLOWED_RECEIPT_TYPES, {
-		message: 'Receipt must be a JPG, PNG, WEBP, HEIC, or PDF file'
+		message: 'Receipt must be a PNG, JPEG, or PDF file'
 	})
 	.refine((f) => f.size <= MAX_RECEIPT_BYTES, { message: 'Receipt must be smaller than 10 MB' });

@@ -120,6 +120,7 @@
 						<div class="min-w-0 flex-1">
 							<input
 								name="name"
+								required
 								value={sub.name}
 								onchange={(e) => e.currentTarget.form?.requestSubmit()}
 								class="w-full truncate rounded-lg border border-transparent bg-transparent px-0 py-0 text-[12.5px] font-semibold text-ink outline-none focus:border-accent focus:bg-panel focus:px-2 focus:py-1.5"
@@ -165,6 +166,7 @@
 						<input
 							name="next_due_date"
 							type="date"
+							required
 							value={sub.next_due_date}
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="rounded-lg border border-border-strong bg-panel px-2 py-1.5 font-mono text-xs text-muted outline-none focus:border-accent"
@@ -173,6 +175,8 @@
 							name="amount"
 							type="number"
 							step="0.01"
+							min="0.01"
+							required
 							value={sub.amount}
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="w-24 rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
@@ -226,6 +230,7 @@
 			<div class="text-[12.5px] font-semibold">Add subscription</div>
 			<input
 				name="name"
+				required
 				bind:value={newName}
 				placeholder="e.g. Netflix"
 				class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
@@ -233,6 +238,10 @@
 			<div class="flex gap-2.5">
 				<input
 					name="amount"
+					type="number"
+					step="0.01"
+					min="0.01"
+					required
 					bind:value={newAmount}
 					placeholder="Amount (Rs 0)"
 					class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
@@ -250,6 +259,7 @@
 			<input
 				name="next_due_date"
 				type="date"
+				required
 				bind:value={newNextDueDate}
 				class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
 			/>
