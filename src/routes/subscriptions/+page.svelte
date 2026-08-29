@@ -136,10 +136,10 @@
 								await update({ reset: false });
 							};
 						}}
-						class="flex min-w-0 flex-1 flex-wrap items-center gap-2.5"
+						class="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2.5"
 					>
 						<input type="hidden" name="id" value={sub.id} />
-						<div class="min-w-0 flex-1">
+						<div class="min-w-0 sm:flex-1">
 							<input
 								name="name"
 								required
@@ -153,93 +153,104 @@
 									: ''}
 							</div>
 						</div>
-						<Select.Root
-							type="single"
-							name="cadence"
-							value={sub.cadence}
-							onValueChange={async () => {
-								await tick();
-								rowFormEl.current?.requestSubmit();
-							}}
-						>
-							<Select.Trigger class="h-auto w-auto min-w-24 border-none bg-transparent px-2 py-1.5 text-[12px] text-dim focus:ring-0">
-								<Select.Value />
-							</Select.Trigger>
-							<Select.Content>
-								{#each cadences as c (c.value)}
-									<Select.Item value={c.value} label={c.label} />
-								{/each}
-							</Select.Content>
-						</Select.Root>
-						<Select.Root
-							type="single"
-							name="category_id"
-							value={sub.category_id ? String(sub.category_id) : ''}
-							onValueChange={async () => {
-								await tick();
-								rowFormEl.current?.requestSubmit();
-							}}
-						>
-							<Select.Trigger class="h-auto w-auto min-w-28 border-none bg-transparent px-2 py-1.5 text-[12px] text-dim focus:ring-0">
-								<Select.Value placeholder="No category" />
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value="" label="No category" />
-								{#each data.categories as category (category.id)}
-									<Select.Item value={String(category.id)} label={category.name} />
-								{/each}
-							</Select.Content>
-						</Select.Root>
-						<Select.Root
-							type="single"
-							name="account_id"
-							value={sub.account_id ? String(sub.account_id) : ''}
-							onValueChange={async () => {
-								await tick();
-								rowFormEl.current?.requestSubmit();
-							}}
-						>
-							<Select.Trigger class="h-auto w-auto min-w-28 border-none bg-transparent px-2 py-1.5 text-[12px] text-dim focus:ring-0">
-								<Select.Value placeholder="No account" />
-							</Select.Trigger>
-							<Select.Content>
-								<Select.Item value="" label="No account" />
-								{#each data.accounts as account (account.id)}
-									<Select.Item value={String(account.id)} label={account.name} />
-								{/each}
-							</Select.Content>
-						</Select.Root>
-						<DatePicker
-							name="next_due_date"
-							value={sub.next_due_date}
-							required
-							onValueChange={async () => {
-								await tick();
-								rowFormEl.current?.requestSubmit();
-							}}
-							class="border-none bg-transparent px-2 py-1.5 font-mono text-xs text-muted focus:ring-0"
-						/>
-						<input
-							name="amount"
-							type="number"
-							step="0.01"
-							min="0.01"
-							required
-							value={sub.amount}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="w-24 rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
-						/>
-						<label class="flex items-center gap-1.5 text-[11.5px] text-muted">
-							<Checkbox
-								name="is_active"
-								checked={sub.is_active}
-								onCheckedChange={async () => {
+						<div class="grid grid-cols-2 gap-2 sm:contents">
+							<Select.Root
+								type="single"
+								name="cadence"
+								items={cadences}
+								value={sub.cadence}
+								onValueChange={async () => {
 									await tick();
 									rowFormEl.current?.requestSubmit();
 								}}
+							>
+								<Select.Trigger class="h-auto w-full border-border-strong bg-panel px-2 py-1.5 text-[12px] text-dim focus:ring-0 sm:w-auto sm:min-w-24 sm:border-none sm:bg-transparent">
+									<Select.Value />
+								</Select.Trigger>
+								<Select.Content>
+									{#each cadences as c (c.value)}
+										<Select.Item value={c.value} label={c.label} />
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							<Select.Root
+								type="single"
+								name="category_id"
+								items={[
+									{ value: '', label: 'No category' },
+									...data.categories.map((c) => ({ value: String(c.id), label: c.name }))
+								]}
+								value={sub.category_id ? String(sub.category_id) : ''}
+								onValueChange={async () => {
+									await tick();
+									rowFormEl.current?.requestSubmit();
+								}}
+							>
+								<Select.Trigger class="h-auto w-full border-border-strong bg-panel px-2 py-1.5 text-[12px] text-dim focus:ring-0 sm:w-auto sm:min-w-28 sm:border-none sm:bg-transparent">
+									<Select.Value placeholder="No category" />
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="" label="No category" />
+									{#each data.categories as category (category.id)}
+										<Select.Item value={String(category.id)} label={category.name} />
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							<Select.Root
+								type="single"
+								name="account_id"
+								items={[
+									{ value: '', label: 'No account' },
+									...data.accounts.map((a) => ({ value: String(a.id), label: a.name }))
+								]}
+								value={sub.account_id ? String(sub.account_id) : ''}
+								onValueChange={async () => {
+									await tick();
+									rowFormEl.current?.requestSubmit();
+								}}
+							>
+								<Select.Trigger class="h-auto w-full border-border-strong bg-panel px-2 py-1.5 text-[12px] text-dim focus:ring-0 sm:w-auto sm:min-w-28 sm:border-none sm:bg-transparent">
+									<Select.Value placeholder="No account" />
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="" label="No account" />
+									{#each data.accounts as account (account.id)}
+										<Select.Item value={String(account.id)} label={account.name} />
+									{/each}
+								</Select.Content>
+							</Select.Root>
+							<DatePicker
+								name="next_due_date"
+								value={sub.next_due_date}
+								required
+								onValueChange={async () => {
+									await tick();
+									rowFormEl.current?.requestSubmit();
+								}}
+								class="w-full border-border-strong bg-panel px-2 py-1.5 font-mono text-xs text-muted focus:ring-0 sm:w-auto sm:border-none sm:bg-transparent"
 							/>
-							Active
-						</label>
+							<input
+								name="amount"
+								type="number"
+								step="0.01"
+								min="0.01"
+								required
+								value={sub.amount}
+								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								class="w-full rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent sm:w-24"
+							/>
+							<label class="flex items-center gap-1.5 text-[11.5px] text-muted">
+								<Checkbox
+									name="is_active"
+									checked={sub.is_active}
+									onCheckedChange={async () => {
+										await tick();
+										rowFormEl.current?.requestSubmit();
+									}}
+								/>
+								Active
+							</label>
+						</div>
 					</form>
 					<form bind:this={removeFormEl.current} method="POST" action="?/removeSubscription" use:enhance>
 						<input type="hidden" name="id" value={sub.id} />
@@ -298,10 +309,10 @@
 					required
 					bind:value={newAmount}
 					placeholder="Amount (Rs 0)"
-					class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
+					class="min-w-0 flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
 				/>
-				<Select.Root type="single" name="cadence" bind:value={newCadence}>
-					<Select.Trigger class="flex-1">
+				<Select.Root type="single" name="cadence" items={cadences} bind:value={newCadence}>
+					<Select.Trigger class="min-w-0 flex-1">
 						<Select.Value />
 					</Select.Trigger>
 					<Select.Content>
@@ -313,8 +324,13 @@
 			</div>
 			<DatePicker name="next_due_date" bind:value={newNextDueDate} required class="w-full" />
 			<div class="flex gap-2.5">
-				<Select.Root type="single" name="category_id" bind:value={newCategoryId}>
-					<Select.Trigger class="flex-1">
+				<Select.Root
+					type="single"
+					name="category_id"
+					items={data.categories.map((c) => ({ value: String(c.id), label: c.name }))}
+					bind:value={newCategoryId}
+				>
+					<Select.Trigger class="min-w-0 flex-1">
 						<Select.Value placeholder="No category" />
 					</Select.Trigger>
 					<Select.Content>
@@ -324,8 +340,13 @@
 						{/each}
 					</Select.Content>
 				</Select.Root>
-				<Select.Root type="single" name="account_id" bind:value={newAccountId}>
-					<Select.Trigger class="flex-1">
+				<Select.Root
+					type="single"
+					name="account_id"
+					items={data.accounts.map((a) => ({ value: String(a.id), label: a.name }))}
+					bind:value={newAccountId}
+				>
+					<Select.Trigger class="min-w-0 flex-1">
 						<Select.Value placeholder="No account" />
 					</Select.Trigger>
 					<Select.Content>

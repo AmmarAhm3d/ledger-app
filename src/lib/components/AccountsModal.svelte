@@ -101,6 +101,7 @@
 						<Select.Root
 							type="single"
 							name="type"
+							items={ACCOUNT_TYPES.map((type) => ({ value: type, label: type }))}
 							value={account.type}
 							onValueChange={async () => {
 								await tick();

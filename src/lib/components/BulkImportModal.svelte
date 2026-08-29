@@ -276,6 +276,7 @@
 								<td class="px-1.5 py-1">
 									<Select.Root
 										type="single"
+										items={accounts.map((a) => ({ value: String(a.id), label: a.name }))}
 										value={String(entry.account_id)}
 										onValueChange={(v) => updateEntryAccount(i, Number(v))}
 									>
@@ -292,6 +293,7 @@
 								<td class="px-1.5 py-1">
 									<Select.Root
 										type="single"
+										items={categories.map((c) => ({ value: String(c.id), label: c.name }))}
 										value={String(entry.category_id)}
 										onValueChange={(v) => updateEntryCategory(i, Number(v))}
 									>

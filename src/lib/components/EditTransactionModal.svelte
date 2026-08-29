@@ -80,7 +80,7 @@
 						name="description"
 						bind:value={description}
 						placeholder="e.g. Whole Foods"
-						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
+						class="w-full rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
 					/>
 				</div>
 				<div class="grid grid-cols-2 gap-3">
@@ -93,7 +93,7 @@
 							step="0.01"
 							required
 							bind:value={amount}
-							class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
+							class="w-full rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
 						/>
 					</div>
 					<div class="flex flex-col gap-1.5">
@@ -104,7 +104,13 @@
 				<div class="grid grid-cols-2 gap-3">
 					<div class="flex flex-col gap-1.5">
 						<span class="text-xs font-semibold text-dim">Account</span>
-						<Select.Root type="single" name="account_id" required bind:value={accountId}>
+						<Select.Root
+							type="single"
+							name="account_id"
+							required
+							items={accounts.map((a) => ({ value: String(a.id), label: a.name }))}
+							bind:value={accountId}
+						>
 							<Select.Trigger>
 								<Select.Value placeholder="Select account" />
 							</Select.Trigger>
@@ -117,7 +123,13 @@
 					</div>
 					<div class="flex flex-col gap-1.5">
 						<span class="text-xs font-semibold text-dim">Category</span>
-						<Select.Root type="single" name="category_id" required bind:value={categoryId}>
+						<Select.Root
+							type="single"
+							name="category_id"
+							required
+							items={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+							bind:value={categoryId}
+						>
 							<Select.Trigger>
 								<Select.Value placeholder="Select category" />
 							</Select.Trigger>

@@ -69,6 +69,10 @@
 					<Select.Root
 						type="single"
 						name="account_id"
+						items={[
+							{ value: '', label: 'No account' },
+							...data.accounts.map((a) => ({ value: String(a.id), label: a.name }))
+						]}
 						value={goal.account_id ? String(goal.account_id) : ''}
 						onValueChange={async () => {
 							await tick();
@@ -187,7 +191,7 @@
 				min="0"
 				bind:value={newCurrentAmount}
 				placeholder="Current amount (Rs 0)"
-				class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
+				class="min-w-0 flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
 			/>
 			<input
 				name="target_amount"
@@ -197,7 +201,7 @@
 				required
 				bind:value={newTargetAmount}
 				placeholder="Target amount"
-				class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
+				class="min-w-0 flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
 			/>
 		</div>
 		<div class="flex gap-2.5">
@@ -205,10 +209,10 @@
 				name="target_date"
 				bind:value={newTargetDate}
 				placeholder="Target date"
-				class="flex-1 justify-start"
+				class="min-w-0 flex-1 justify-start"
 			/>
-			<Select.Root type="single" name="account_id" bind:value={newAccountId}>
-				<Select.Trigger class="flex-1">
+			<Select.Root type="single" name="account_id" items={data.accounts.map((a) => ({ value: String(a.id), label: a.name }))} bind:value={newAccountId}>
+				<Select.Trigger class="min-w-0 flex-1">
 					<Select.Value placeholder="No account" />
 				</Select.Trigger>
 				<Select.Content>

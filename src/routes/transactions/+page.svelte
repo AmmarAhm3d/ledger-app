@@ -175,6 +175,10 @@
 		</div>
 		<Select.Root
 			type="single"
+			items={[
+				{ value: '', label: 'All categories' },
+				...data.categories.map((c) => ({ value: String(c.id), label: c.name }))
+			]}
 			value={data.filters.category ? String(data.filters.category) : ''}
 			onValueChange={(v) => updateParams({ category: v || null })}
 		>
@@ -287,6 +291,7 @@
 						<Select.Root
 							type="single"
 							name="account_id"
+							items={data.accounts.map((a) => ({ value: String(a.id), label: a.name }))}
 							value={String(tx.account_id)}
 							onValueChange={async () => {
 								await tick();
@@ -305,6 +310,7 @@
 						<Select.Root
 							type="single"
 							name="category_id"
+							items={data.categories.map((c) => ({ value: String(c.id), label: c.name }))}
 							value={String(tx.category_id)}
 							onValueChange={async () => {
 								await tick();

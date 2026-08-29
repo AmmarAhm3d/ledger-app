@@ -166,7 +166,7 @@
 					id="tx-description"
 					name="description"
 					placeholder="e.g. Whole Foods"
-					class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
+					class="w-full rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
 				/>
 			</div>
 			<div class="grid grid-cols-2 gap-3">
@@ -180,7 +180,7 @@
 						min="0.01"
 						required
 						placeholder="0.00"
-						class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
+						class="w-full rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
 					/>
 				</div>
 				<div class="flex flex-col gap-1.5">
