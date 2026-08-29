@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
+	import DatePicker from '$lib/components/DatePicker.svelte';
+	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
+	import * as Select from '$lib/components/ui/select';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -33,8 +37,11 @@
 
 	<div class="flex flex-col gap-3">
 		{#each data.goals as goal (goal.id)}
+			{@const rowFormEl = { current: null as HTMLFormElement | null }}
+			{@const removeFormEl = { current: null as HTMLFormElement | null }}
 			<div class="rounded-[10px] border border-border-strong bg-panel-2 px-3 py-2.75">
 				<form
+					bind:this={rowFormEl.current}
 					method="POST"
 					action="?/updateGoal"
 					use:enhance={() => {
@@ -59,23 +66,33 @@
 								: ''}
 						</div>
 					</div>
-					<select
+					<Select.Root
+						type="single"
 						name="account_id"
-						value={goal.account_id ?? ''}
-						onchange={(e) => e.currentTarget.form?.requestSubmit()}
-						class="rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-[12px] text-dim outline-none focus:border-accent"
+						value={goal.account_id ? String(goal.account_id) : ''}
+						onValueChange={async () => {
+							await tick();
+							rowFormEl.current?.requestSubmit();
+						}}
 					>
-						<option value="">No account</option>
-						{#each data.accounts as account (account.id)}
-							<option value={account.id}>{account.name}</option>
-						{/each}
-					</select>
-					<input
+						<Select.Trigger class="h-auto w-auto min-w-28 border-none bg-panel px-2 py-1.5 text-[12px] text-dim focus:ring-0">
+							<Select.Value placeholder="No account" />
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Item value="" label="No account" />
+							{#each data.accounts as account (account.id)}
+								<Select.Item value={String(account.id)} label={account.name} />
+							{/each}
+						</Select.Content>
+					</Select.Root>
+					<DatePicker
 						name="target_date"
-						type="date"
 						value={goal.target_date ?? ''}
-						onchange={(e) => e.currentTarget.form?.requestSubmit()}
-						class="rounded-lg border border-border-strong bg-panel px-2 py-1.5 font-mono text-xs text-muted outline-none focus:border-accent"
+						onValueChange={async () => {
+							await tick();
+							rowFormEl.current?.requestSubmit();
+						}}
+						class="border-none bg-panel px-2 py-1.5 font-mono text-xs text-muted focus:ring-0"
 					/>
 					<input
 						name="current_amount"
@@ -111,15 +128,19 @@
 					<span class="w-10 flex-none text-right font-mono text-[11.5px] font-medium text-dim">
 						{goal.progress}%
 					</span>
-					<form method="POST" action="?/removeGoal" use:enhance>
+					<form bind:this={removeFormEl.current} method="POST" action="?/removeGoal" use:enhance>
 						<input type="hidden" name="id" value={goal.id} />
-						<button
-							type="submit"
-							title="Remove goal"
-							class="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
+						<ConfirmDeleteDialog
+							title="Remove {goal.name}?"
+							description="This savings goal and its progress will be removed."
+							onConfirm={() => removeFormEl.current?.requestSubmit()}
+							triggerTitle="Remove goal"
+							triggerClass="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
 						>
-							<Trash2 size={13} strokeWidth={1.9} />
-						</button>
+							{#snippet trigger()}
+								<Trash2 size={13} strokeWidth={1.9} />
+							{/snippet}
+						</ConfirmDeleteDialog>
 					</form>
 				</div>
 				<div class="mt-1.5 font-mono text-[11px] text-muted">
@@ -180,22 +201,23 @@
 			/>
 		</div>
 		<div class="flex gap-2.5">
-			<input
+			<DatePicker
 				name="target_date"
-				type="date"
 				bind:value={newTargetDate}
-				class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
+				placeholder="Target date"
+				class="flex-1 justify-start"
 			/>
-			<select
-				name="account_id"
-				bind:value={newAccountId}
-				class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
-			>
-				<option value="">No account</option>
-				{#each data.accounts as account (account.id)}
-					<option value={account.id}>{account.name}</option>
-				{/each}
-			</select>
+			<Select.Root type="single" name="account_id" bind:value={newAccountId}>
+				<Select.Trigger class="flex-1">
+					<Select.Value placeholder="No account" />
+				</Select.Trigger>
+				<Select.Content>
+					<Select.Item value="" label="No account" />
+					{#each data.accounts as account (account.id)}
+						<Select.Item value={String(account.id)} label={account.name} />
+					{/each}
+				</Select.Content>
+			</Select.Root>
 		</div>
 		<button
 			type="submit"

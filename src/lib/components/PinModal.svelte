@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Lock, Delete } from '@lucide/svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 
 	type Mode = 'create' | 'confirm' | 'unlock';
 
@@ -29,9 +30,7 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (!open) return;
-		if (e.key === 'Escape') {
-			onClose();
-		} else if (e.key === 'Backspace') {
+		if (e.key === 'Backspace') {
 			e.preventDefault();
 			onPressKey('⌫');
 		} else if (/^[0-9]$/.test(e.key)) {
@@ -43,106 +42,85 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if open}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		onclick={onClose}
-		role="presentation"
-		class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 p-0 sm:p-4 backdrop-blur-md transition-opacity duration-200"
+<Dialog.Root {open} onOpenChange={(next) => !next && onClose()}>
+	<Dialog.Content
+		maxWidth="sm:max-w-[340px]"
+		class="items-center gap-4 rounded-t-3xl border-none p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:rounded-3xl sm:border sm:border-border-strong sm:pb-6"
 	>
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- Drag handle for mobile bottom sheet appearance -->
+		<div class="-mt-1 mb-1 h-1 w-10 rounded-full bg-border-strong sm:hidden"></div>
+
 		<div
-			onclick={(e) => e.stopPropagation()}
-			role="dialog"
-			aria-modal="true"
-			aria-label={copy[mode].title}
-			tabindex="-1"
-			class="flex w-full max-w-full sm:max-w-[340px] flex-col items-center gap-4 rounded-t-3xl sm:rounded-3xl border border-border-strong bg-panel-2 p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl transition-all duration-200"
+			class="flex h-11 w-11 items-center justify-center rounded-2xl border border-accent/20 bg-accent/10 text-accent shadow-sm"
 		>
-			<!-- Drag handle for mobile bottom sheet appearance -->
-			<div class="h-1 w-10 rounded-full bg-border-strong sm:hidden -mt-1 mb-1"></div>
+			<Lock size={20} strokeWidth={2} />
+		</div>
 
-			<!-- Lock Header Badge -->
+		<div class="px-2 text-center">
+			<Dialog.Title class="text-base">{copy[mode].title}</Dialog.Title>
 			<div
-				class="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10 text-accent border border-accent/20 shadow-sm"
+				class="mt-1 text-xs transition-colors duration-150"
+				class:text-red={error}
+				class:text-muted={!error}
 			>
-				<Lock size={20} strokeWidth={2} />
-			</div>
-
-			<!-- Title & Subtitle -->
-			<div class="text-center px-2">
-				<div class="text-base font-semibold tracking-tight text-ink">{copy[mode].title}</div>
-				<div
-					class="mt-1 text-xs transition-colors duration-150"
-					class:text-red={error}
-					class:text-muted={!error}
-				>
-					{error ? 'Incorrect PIN, try again.' : copy[mode].subtitle}
-				</div>
-			</div>
-
-			<!-- PIN Dots Indicator -->
-			<div
-				class="my-1 flex items-center justify-center gap-3.5"
-				class:animate-shake={error}
-			>
-				{#each { length: 4 } as _, i (i)}
-					<div
-						class="h-3.5 w-3.5 rounded-full transition-all duration-200"
-						class:bg-red={error}
-						class:bg-accent={!error && dotFilled(i)}
-						class:bg-panel-strong={!error && !dotFilled(i)}
-						class:scale-110={error || (!error && dotFilled(i))}
-						class:shadow-sm={!error && dotFilled(i)}
-						class:shadow-accent-40={!error && dotFilled(i)}
-						class:border={!error && !dotFilled(i)}
-						class:border-border-strong={!error && !dotFilled(i)}
-					></div>
-				{/each}
-			</div>
-
-			<!-- Circular Numpad Grid -->
-			<div class="mt-2 grid w-full max-w-[260px] grid-cols-3 gap-3.5 justify-items-center">
-				{#each keys as key (key || 'blank')}
-					{#if key === ''}
-						<div class="h-15 w-15"></div>
-					{:else}
-						<button
-							type="button"
-							onclick={() => onPressKey(key)}
-							aria-label={key === '⌫' ? 'Backspace' : `Digit ${key}`}
-							class="flex h-15 w-15 items-center justify-center rounded-full border border-border/80 bg-panel-hover text-xl font-medium text-ink transition-all duration-150 hover:bg-panel-strong hover:border-border-strong active:scale-90 active:bg-accent/20 select-none cursor-pointer"
-						>
-							{#if key === '⌫'}
-								<Delete size={20} strokeWidth={2} class="text-subtle" />
-							{:else}
-								<span>{key}</span>
-							{/if}
-						</button>
-					{/if}
-				{/each}
-			</div>
-
-			<!-- Action Buttons -->
-			<div class="mt-2 flex items-center gap-4">
-				<button
-					type="button"
-					onclick={onClose}
-					class="border-none bg-transparent text-xs font-semibold text-muted hover:text-ink transition-colors px-2 py-1 cursor-pointer"
-				>
-					Cancel
-				</button>
-				{#if mode === 'unlock'}
-					<button
-						type="button"
-						onclick={onReset}
-						class="border-none bg-transparent text-xs font-semibold text-muted hover:text-ink transition-colors px-2 py-1 cursor-pointer"
-					>
-						Forgot PIN?
-					</button>
-				{/if}
+				{error ? 'Incorrect PIN, try again.' : copy[mode].subtitle}
 			</div>
 		</div>
-	</div>
-{/if}
+
+		<div class="my-1 flex items-center justify-center gap-3.5" class:animate-shake={error}>
+			{#each { length: 4 } as _, i (i)}
+				<div
+					class="h-3.5 w-3.5 rounded-full transition-all duration-200"
+					class:bg-red={error}
+					class:bg-accent={!error && dotFilled(i)}
+					class:bg-panel-strong={!error && !dotFilled(i)}
+					class:scale-110={error || (!error && dotFilled(i))}
+					class:shadow-sm={!error && dotFilled(i)}
+					class:shadow-accent-40={!error && dotFilled(i)}
+					class:border={!error && !dotFilled(i)}
+					class:border-border-strong={!error && !dotFilled(i)}
+				></div>
+			{/each}
+		</div>
+
+		<div class="mt-2 grid w-full max-w-[260px] grid-cols-3 gap-3.5 justify-items-center">
+			{#each keys as key (key || 'blank')}
+				{#if key === ''}
+					<div class="h-15 w-15"></div>
+				{:else}
+					<button
+						type="button"
+						onclick={() => onPressKey(key)}
+						aria-label={key === '⌫' ? 'Backspace' : `Digit ${key}`}
+						class="flex h-15 w-15 cursor-pointer items-center justify-center rounded-full border border-border/80 bg-panel-hover text-xl font-medium text-ink transition-all duration-150 select-none hover:border-border-strong hover:bg-panel-strong active:scale-90 active:bg-accent/20"
+					>
+						{#if key === '⌫'}
+							<Delete size={20} strokeWidth={2} class="text-subtle" />
+						{:else}
+							<span>{key}</span>
+						{/if}
+					</button>
+				{/if}
+			{/each}
+		</div>
+
+		<div class="mt-2 flex items-center gap-4">
+			<button
+				type="button"
+				onclick={onClose}
+				class="cursor-pointer border-none bg-transparent px-2 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+			>
+				Cancel
+			</button>
+			{#if mode === 'unlock'}
+				<button
+					type="button"
+					onclick={onReset}
+					class="cursor-pointer border-none bg-transparent px-2 py-1 text-xs font-semibold text-muted transition-colors hover:text-ink"
+				>
+					Forgot PIN?
+				</button>
+			{/if}
+		</div>
+	</Dialog.Content>
+</Dialog.Root>

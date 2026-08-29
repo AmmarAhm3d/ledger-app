@@ -2,10 +2,15 @@
 	import { enhance } from '$app/forms';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { tick } from 'svelte';
 	import { Paperclip, Repeat, Search, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
 	import { pending } from '$lib/pending.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import DatePicker from '$lib/components/DatePicker.svelte';
+	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
+	import * as Select from '$lib/components/ui/select';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -15,6 +20,7 @@
 	let selectedIds = $state(new Set<number>());
 	let deleting = $state(false);
 	let savingIds = $state(new Set<number>());
+	let deleteFormEl = $state<HTMLFormElement | null>(null);
 
 	let selectableIds = $derived(data.transactions.filter((tx) => !tx.is_transfer).map((tx) => tx.id));
 	let allSelected = $derived(
@@ -54,10 +60,6 @@
 		searchDebounce = setTimeout(() => {
 			updateParams({ search: searchInput.trim() || null });
 		}, 350);
-	}
-
-	function onCategoryChange(e: Event & { currentTarget: HTMLSelectElement }) {
-		updateParams({ category: e.currentTarget.value || null });
 	}
 
 	function goToPage(targetPage: number) {
@@ -119,6 +121,7 @@
 		</span>
 		{#if selectedIds.size > 0}
 			<form
+				bind:this={deleteFormEl}
 				method="POST"
 				action="?/deleteTransactions"
 				use:enhance={() => {
@@ -134,14 +137,18 @@
 				{#each selectedIds as id (id)}
 					<input type="hidden" name="ids" value={id} />
 				{/each}
-				<button
-					type="submit"
-					disabled={deleting}
-					class="flex items-center gap-1.5 rounded-[9px] border border-red/40 bg-red/10 px-3 py-1.5 text-[12.5px] font-semibold text-red transition-colors duration-100 hover:bg-red/18 disabled:opacity-60"
+				<ConfirmDeleteDialog
+					title="Delete {selectedIds.size} selected transaction{selectedIds.size === 1 ? '' : 's'}?"
+					description="This can't be undone. Account balances will be adjusted to reflect the removal."
+					confirmLabel="Delete"
+					onConfirm={() => deleteFormEl?.requestSubmit()}
+					triggerClass="flex items-center gap-1.5 rounded-[9px] border border-red/40 bg-red/10 px-3 py-1.5 text-[12.5px] font-semibold text-red transition-colors duration-100 hover:bg-red/18 disabled:opacity-60"
 				>
-					<Trash2 size={13} strokeWidth={1.9} />
-					Delete {selectedIds.size} selected
-				</button>
+					{#snippet trigger()}
+						<Trash2 size={13} strokeWidth={1.9} />
+						Delete {selectedIds.size} selected
+					{/snippet}
+				</ConfirmDeleteDialog>
 			</form>
 		{/if}
 	</div>
@@ -166,16 +173,21 @@
 				class="w-full rounded-[9px] border border-border bg-panel-2 py-1.5 pr-2.5 pl-8 text-[12.5px] text-ink outline-none focus:border-accent"
 			/>
 		</div>
-		<select
-			value={data.filters.category ?? ''}
-			onchange={onCategoryChange}
-			class="rounded-[9px] border border-border bg-panel-2 px-2.5 py-1.5 text-[12.5px] text-dim outline-none focus:border-accent"
+		<Select.Root
+			type="single"
+			value={data.filters.category ? String(data.filters.category) : ''}
+			onValueChange={(v) => updateParams({ category: v || null })}
 		>
-			<option value="">All categories</option>
-			{#each data.categories as category (category.id)}
-				<option value={category.id}>{category.name}</option>
-			{/each}
-		</select>
+			<Select.Trigger class="w-auto min-w-40 py-1.5 text-[12.5px] text-dim">
+				<Select.Value placeholder="All categories" />
+			</Select.Trigger>
+			<Select.Content>
+				<Select.Item value="" label="All categories" />
+				{#each data.categories as category (category.id)}
+					<Select.Item value={String(category.id)} label={category.name} />
+				{/each}
+			</Select.Content>
+		</Select.Root>
 	</div>
 
 	{#if form?.message}
@@ -187,11 +199,10 @@
 			<div
 				class="grid grid-cols-[28px_minmax(0,1.8fr)_1fr_1fr_0.9fr_0.7fr_1fr] items-center gap-3 border-b border-border bg-panel-2 px-4.5 py-2.5 text-[11px] font-semibold tracking-wider text-muted uppercase"
 			>
-				<input
-					type="checkbox"
+				<Checkbox
 					aria-label="Select all"
 					checked={allSelected}
-					onchange={toggleAll}
+					onCheckedChange={toggleAll}
 					disabled={selectableIds.length === 0}
 				/>
 				<div>Description</div>
@@ -241,7 +252,9 @@
 						</div>
 					</div>
 				{:else}
+					{@const rowFormEl = { current: null as HTMLFormElement | null }}
 					<form
+						bind:this={rowFormEl.current}
 						method="POST"
 						action="?/updateTransaction"
 						use:enhance={() => {
@@ -259,11 +272,10 @@
 					>
 						<input type="hidden" name="id" value={tx.id} />
 						<input type="hidden" name="transaction_id" value={tx.id} />
-						<input
-							type="checkbox"
+						<Checkbox
 							aria-label={`Select ${tx.description ?? 'transaction'}`}
 							checked={selectedIds.has(tx.id)}
-							onchange={() => toggleOne(tx.id)}
+							onCheckedChange={() => toggleOne(tx.id)}
 						/>
 						<input
 							name="description"
@@ -272,33 +284,51 @@
 							onchange={(e) => e.currentTarget.form?.requestSubmit()}
 							class="min-w-0 truncate rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 text-[13px] font-medium text-ink outline-none focus:border-accent focus:bg-panel"
 						/>
-						<select
+						<Select.Root
+							type="single"
 							name="account_id"
-							value={tx.account_id}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="min-w-0 truncate rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 text-[12px] text-muted outline-none focus:border-accent focus:bg-panel"
+							value={String(tx.account_id)}
+							onValueChange={async () => {
+								await tick();
+								rowFormEl.current?.requestSubmit();
+							}}
 						>
-							{#each data.accounts as account (account.id)}
-								<option value={account.id}>{account.name}</option>
-							{/each}
-						</select>
-						<select
+							<Select.Trigger class="h-auto min-w-0 truncate border-none bg-transparent px-1.5 py-1.5 text-[12px] text-muted focus:ring-0">
+								<Select.Value />
+							</Select.Trigger>
+							<Select.Content>
+								{#each data.accounts as account (account.id)}
+									<Select.Item value={String(account.id)} label={account.name} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
+						<Select.Root
+							type="single"
 							name="category_id"
-							value={tx.category_id}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="min-w-0 rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 text-[12px] text-dim outline-none focus:border-accent focus:bg-panel"
+							value={String(tx.category_id)}
+							onValueChange={async () => {
+								await tick();
+								rowFormEl.current?.requestSubmit();
+							}}
 						>
-							{#each data.categories as category (category.id)}
-								<option value={category.id}>{category.name}</option>
-							{/each}
-						</select>
-						<input
+							<Select.Trigger class="h-auto min-w-0 border-none bg-transparent px-1.5 py-1.5 text-[12px] text-dim focus:ring-0">
+								<Select.Value />
+							</Select.Trigger>
+							<Select.Content>
+								{#each data.categories as category (category.id)}
+									<Select.Item value={String(category.id)} label={category.name} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
+						<DatePicker
 							name="date"
-							type="date"
-							required
 							value={tx.date}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="rounded-lg border border-transparent bg-transparent px-1.5 py-1.5 font-mono text-xs text-muted outline-none focus:border-accent focus:bg-panel"
+							required
+							onValueChange={async () => {
+								await tick();
+								rowFormEl.current?.requestSubmit();
+							}}
+							class="border-none bg-transparent px-1.5 py-1.5 font-mono text-xs text-muted focus:ring-0"
 						/>
 						<div class="flex items-center gap-1.5">
 							{#if tx.has_receipt && tx.receipt_url}

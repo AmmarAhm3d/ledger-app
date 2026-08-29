@@ -9,8 +9,11 @@
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
 	import TransferModal from '$lib/components/TransferModal.svelte';
 	import BulkImportModal from '$lib/components/BulkImportModal.svelte';
+	import EditTransactionModal from '$lib/components/EditTransactionModal.svelte';
+	import { Toaster } from '$lib/components/ui/sonner';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
+	import type { SearchResult } from '$lib/search-transactions';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
@@ -18,6 +21,7 @@
 
 	type ModalKey = 'accounts' | 'addTransaction' | 'transfer' | 'bulkImport' | null;
 	let activeModal = $state<ModalKey>(null);
+	let editingTransaction = $state<SearchResult | null>(null);
 
 	async function handleSignOut() {
 		await authClient.signOut();
@@ -26,6 +30,7 @@
 </script>
 
 {#if data.user}
+	<Toaster />
 	<div class="flex min-h-screen text-ink">
 		<Sidebar
 			accountCount={data.accounts.length}
@@ -40,9 +45,11 @@
 			<DashboardHeader
 				title={(page.data.title as string | undefined) ?? 'Overview'}
 				subtitle={(page.data.subtitle as string | undefined) ?? ''}
+				suggestedTransactions={data.suggestedTransactions}
 				onAddTransaction={() => (activeModal = 'addTransaction')}
 				onTransfer={() => (activeModal = 'transfer')}
 				onBulkImport={() => (activeModal = 'bulkImport')}
+				onSelectTransaction={(tx) => (editingTransaction = tx)}
 				onToggleNav={() => (mobileNavOpen = true)}
 			/>
 
@@ -79,6 +86,13 @@
 		accounts={data.accounts}
 		categories={data.categories}
 		onClose={() => (activeModal = null)}
+	/>
+
+	<EditTransactionModal
+		transaction={editingTransaction}
+		accounts={data.accounts}
+		categories={data.categories}
+		onClose={() => (editingTransaction = null)}
 	/>
 {:else}
 	{@render children()}
