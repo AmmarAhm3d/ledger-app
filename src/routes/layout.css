@@ -1,6 +1,13 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 @theme {
+	/* shadcn-svelte primitives (Dialog/AlertDialog/Select/Popover/Command/Calendar)
+	   are hand-authored against this app's existing panel/ink/border tokens above —
+	   `destructive` is the one concept those primitives need that has no existing
+	   analog (the app's own components use `text-red`/`border-red` ad hoc). */
+	--color-destructive: var(--color-red);
+	--color-destructive-foreground: #fef2f2;
 	--font-sans: 'Instrument Sans', -apple-system, Helvetica, Arial, sans-serif;
 	--font-mono: 'IBM Plex Mono', monospace;
 

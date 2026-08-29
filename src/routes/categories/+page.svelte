@@ -3,6 +3,7 @@
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { pending } from '$lib/pending.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
@@ -39,6 +40,7 @@
 			</div>
 		{/if}
 		{#each data.categories as category (category.id)}
+			{@const removeFormEl = { current: null as HTMLFormElement | null }}
 			<div
 				class="flex items-center gap-2.5 rounded-[10px] border border-border-strong bg-panel-2 px-2.5 py-2.25"
 				class:opacity-50={savingIds.has(category.id)}
@@ -79,15 +81,19 @@
 						class="w-27.5 rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
 					/>
 				</form>
-				<form method="POST" action="?/removeCategory" use:enhance>
+				<form bind:this={removeFormEl.current} method="POST" action="?/removeCategory" use:enhance>
 					<input type="hidden" name="id" value={category.id} />
-					<button
-						type="submit"
-						title="Remove category"
-						class="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
+					<ConfirmDeleteDialog
+						title="Remove {category.name}?"
+						description="Existing transactions keep this category, but you won't be able to pick it for new ones."
+						onConfirm={() => removeFormEl.current?.requestSubmit()}
+						triggerTitle="Remove category"
+						triggerClass="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
 					>
-						<Trash2 size={13} strokeWidth={1.9} />
-					</button>
+						{#snippet trigger()}
+							<Trash2 size={13} strokeWidth={1.9} />
+						{/snippet}
+					</ConfirmDeleteDialog>
 				</form>
 			</div>
 		{:else}

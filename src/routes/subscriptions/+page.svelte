@@ -1,10 +1,23 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { tick } from 'svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
+	import DatePicker from '$lib/components/DatePicker.svelte';
+	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
+	import Checkbox from '$lib/components/ui/checkbox.svelte';
+	import * as Select from '$lib/components/ui/select';
 	import type { ActionData, PageData } from './$types';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
+
+	function today() {
+		const now = new Date();
+		const year = now.getFullYear();
+		const month = String(now.getMonth() + 1).padStart(2, '0');
+		const day = String(now.getDate()).padStart(2, '0');
+		return `${year}-${month}-${day}`;
+	}
 
 	let newName = $state('');
 	let newAmount = $state('');
@@ -28,6 +41,12 @@
 		if (days === 0) return 'Due today';
 		return `${days} day${days === 1 ? '' : 's'}`;
 	}
+
+	const cadences = [
+		{ value: 'weekly', label: 'Weekly' },
+		{ value: 'monthly', label: 'Monthly' },
+		{ value: 'yearly', label: 'Yearly' }
+	];
 </script>
 
 <section class="flex flex-col gap-4">
@@ -103,10 +122,13 @@
 
 		<div class="flex flex-col gap-2">
 			{#each data.subscriptions as sub (sub.id)}
+				{@const rowFormEl = { current: null as HTMLFormElement | null }}
+				{@const removeFormEl = { current: null as HTMLFormElement | null }}
 				<div
 					class="flex flex-col gap-2 rounded-[10px] border border-border-strong bg-panel-2 px-2.5 py-2.25 sm:flex-row sm:items-center"
 				>
 					<form
+						bind:this={rowFormEl.current}
 						method="POST"
 						action="?/updateSubscription"
 						use:enhance={() => {
@@ -131,45 +153,71 @@
 									: ''}
 							</div>
 						</div>
-						<select
+						<Select.Root
+							type="single"
 							name="cadence"
 							value={sub.cadence}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-[12px] text-dim outline-none focus:border-accent"
+							onValueChange={async () => {
+								await tick();
+								rowFormEl.current?.requestSubmit();
+							}}
 						>
-							<option value="weekly">Weekly</option>
-							<option value="monthly">Monthly</option>
-							<option value="yearly">Yearly</option>
-						</select>
-						<select
+							<Select.Trigger class="h-auto w-auto min-w-24 border-none bg-transparent px-2 py-1.5 text-[12px] text-dim focus:ring-0">
+								<Select.Value />
+							</Select.Trigger>
+							<Select.Content>
+								{#each cadences as c (c.value)}
+									<Select.Item value={c.value} label={c.label} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
+						<Select.Root
+							type="single"
 							name="category_id"
-							value={sub.category_id ?? ''}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-[12px] text-dim outline-none focus:border-accent"
+							value={sub.category_id ? String(sub.category_id) : ''}
+							onValueChange={async () => {
+								await tick();
+								rowFormEl.current?.requestSubmit();
+							}}
 						>
-							<option value="">No category</option>
-							{#each data.categories as category (category.id)}
-								<option value={category.id}>{category.name}</option>
-							{/each}
-						</select>
-						<select
+							<Select.Trigger class="h-auto w-auto min-w-28 border-none bg-transparent px-2 py-1.5 text-[12px] text-dim focus:ring-0">
+								<Select.Value placeholder="No category" />
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="" label="No category" />
+								{#each data.categories as category (category.id)}
+									<Select.Item value={String(category.id)} label={category.name} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
+						<Select.Root
+							type="single"
 							name="account_id"
-							value={sub.account_id ?? ''}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-[12px] text-dim outline-none focus:border-accent"
+							value={sub.account_id ? String(sub.account_id) : ''}
+							onValueChange={async () => {
+								await tick();
+								rowFormEl.current?.requestSubmit();
+							}}
 						>
-							<option value="">No account</option>
-							{#each data.accounts as account (account.id)}
-								<option value={account.id}>{account.name}</option>
-							{/each}
-						</select>
-						<input
+							<Select.Trigger class="h-auto w-auto min-w-28 border-none bg-transparent px-2 py-1.5 text-[12px] text-dim focus:ring-0">
+								<Select.Value placeholder="No account" />
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="" label="No account" />
+								{#each data.accounts as account (account.id)}
+									<Select.Item value={String(account.id)} label={account.name} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
+						<DatePicker
 							name="next_due_date"
-							type="date"
-							required
 							value={sub.next_due_date}
-							onchange={(e) => e.currentTarget.form?.requestSubmit()}
-							class="rounded-lg border border-border-strong bg-panel px-2 py-1.5 font-mono text-xs text-muted outline-none focus:border-accent"
+							required
+							onValueChange={async () => {
+								await tick();
+								rowFormEl.current?.requestSubmit();
+							}}
+							class="border-none bg-transparent px-2 py-1.5 font-mono text-xs text-muted focus:ring-0"
 						/>
 						<input
 							name="amount"
@@ -182,24 +230,30 @@
 							class="w-24 rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
 						/>
 						<label class="flex items-center gap-1.5 text-[11.5px] text-muted">
-							<input
-								type="checkbox"
+							<Checkbox
 								name="is_active"
 								checked={sub.is_active}
-								onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								onCheckedChange={async () => {
+									await tick();
+									rowFormEl.current?.requestSubmit();
+								}}
 							/>
 							Active
 						</label>
 					</form>
-					<form method="POST" action="?/removeSubscription" use:enhance>
+					<form bind:this={removeFormEl.current} method="POST" action="?/removeSubscription" use:enhance>
 						<input type="hidden" name="id" value={sub.id} />
-						<button
-							type="submit"
-							title="Remove subscription"
-							class="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
+						<ConfirmDeleteDialog
+							title="Remove {sub.name}?"
+							description="This subscription will stop generating suggested transactions."
+							onConfirm={() => removeFormEl.current?.requestSubmit()}
+							triggerTitle="Remove subscription"
+							triggerClass="flex h-6.5 w-6.5 flex-none items-center justify-center rounded-lg text-muted transition-colors duration-100 hover:bg-panel-strong hover:text-red"
 						>
-							<Trash2 size={13} strokeWidth={1.9} />
-						</button>
+							{#snippet trigger()}
+								<Trash2 size={13} strokeWidth={1.9} />
+							{/snippet}
+						</ConfirmDeleteDialog>
 					</form>
 				</div>
 			{:else}
@@ -246,44 +300,41 @@
 					placeholder="Amount (Rs 0)"
 					class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
 				/>
-				<select
-					name="cadence"
-					bind:value={newCadence}
-					class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
-				>
-					<option value="weekly">Weekly</option>
-					<option value="monthly">Monthly</option>
-					<option value="yearly">Yearly</option>
-				</select>
+				<Select.Root type="single" name="cadence" bind:value={newCadence}>
+					<Select.Trigger class="flex-1">
+						<Select.Value />
+					</Select.Trigger>
+					<Select.Content>
+						{#each cadences as c (c.value)}
+							<Select.Item value={c.value} label={c.label} />
+						{/each}
+					</Select.Content>
+				</Select.Root>
 			</div>
-			<input
-				name="next_due_date"
-				type="date"
-				required
-				bind:value={newNextDueDate}
-				class="rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 font-mono text-[13px] text-ink outline-none focus:border-accent"
-			/>
+			<DatePicker name="next_due_date" bind:value={newNextDueDate} required class="w-full" />
 			<div class="flex gap-2.5">
-				<select
-					name="category_id"
-					bind:value={newCategoryId}
-					class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
-				>
-					<option value="">No category</option>
-					{#each data.categories as category (category.id)}
-						<option value={category.id}>{category.name}</option>
-					{/each}
-				</select>
-				<select
-					name="account_id"
-					bind:value={newAccountId}
-					class="flex-1 rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent"
-				>
-					<option value="">No account</option>
-					{#each data.accounts as account (account.id)}
-						<option value={account.id}>{account.name}</option>
-					{/each}
-				</select>
+				<Select.Root type="single" name="category_id" bind:value={newCategoryId}>
+					<Select.Trigger class="flex-1">
+						<Select.Value placeholder="No category" />
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="" label="No category" />
+						{#each data.categories as category (category.id)}
+							<Select.Item value={String(category.id)} label={category.name} />
+						{/each}
+					</Select.Content>
+				</Select.Root>
+				<Select.Root type="single" name="account_id" bind:value={newAccountId}>
+					<Select.Trigger class="flex-1">
+						<Select.Value placeholder="No account" />
+					</Select.Trigger>
+					<Select.Content>
+						<Select.Item value="" label="No account" />
+						{#each data.accounts as account (account.id)}
+							<Select.Item value={String(account.id)} label={account.name} />
+						{/each}
+					</Select.Content>
+				</Select.Root>
 			</div>
 			<button
 				type="submit"
