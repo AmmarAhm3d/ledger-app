@@ -205,8 +205,39 @@ export const actions: Actions = {
 			.where(eq(recurringSubscriptions.source_transaction_id, transaction_id));
 		if (already) return fail(400, { message: 'Already tracked as a subscription' });
 
+		const name = tx.description ?? 'Subscription';
+
+		// A subscription may already exist under this same name (e.g. the user paid
+		// it from a different account this cycle) — update that one in place instead
+		// of creating a duplicate that would double-count as "due" next cycle.
+		const [existing] = await db
+			.select({ id: recurringSubscriptions.id })
+			.from(recurringSubscriptions)
+			.where(
+				and(
+					eq(recurringSubscriptions.user_id, userId),
+					sql`lower(${recurringSubscriptions.name}) = lower(${name})`
+				)
+			);
+
+		if (existing) {
+			await db
+				.update(recurringSubscriptions)
+				.set({
+					amount: Math.abs(tx.amount),
+					cadence,
+					next_due_date: advanceDate(tx.date, cadence),
+					category_id: tx.category_id,
+					account_id: tx.account_id,
+					is_active: true,
+					source_transaction_id: tx.id
+				})
+				.where(eq(recurringSubscriptions.id, existing.id));
+			return;
+		}
+
 		await db.insert(recurringSubscriptions).values({
-			name: tx.description ?? 'Subscription',
+			name,
 			amount: Math.abs(tx.amount),
 			cadence,
 			next_due_date: advanceDate(tx.date, cadence),

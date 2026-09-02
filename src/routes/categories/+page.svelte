@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { pending } from '$lib/pending.svelte';
+	import { toast } from '$lib/components/ui/sonner';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
 	import type { ActionData, PageData } from './$types';
@@ -51,7 +52,8 @@
 					action="?/updateCategory"
 					use:enhance={() => {
 						savingIds = new Set(savingIds).add(category.id);
-						return async ({ update }) => {
+						return async ({ result, update }) => {
+							if (result.type === 'success') toast.success('Category updated');
 							await update({ reset: false });
 							const next = new Set(savingIds);
 							next.delete(category.id);
@@ -81,7 +83,17 @@
 						class="w-27.5 rounded-lg border border-border-strong bg-panel px-2 py-1.5 text-right font-mono text-[12.5px] text-ink outline-none focus:border-accent"
 					/>
 				</form>
-				<form bind:this={removeFormEl.current} method="POST" action="?/removeCategory" use:enhance>
+				<form
+					bind:this={removeFormEl.current}
+					method="POST"
+					action="?/removeCategory"
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type === 'success') toast.success('Category removed');
+							await update();
+						};
+					}}
+				>
 					<input type="hidden" name="id" value={category.id} />
 					<ConfirmDeleteDialog
 						title="Remove {category.name}?"
@@ -108,7 +120,8 @@
 		action="?/addCategory"
 		use:enhance={() => {
 			pending.start('categories');
-			return async ({ update }) => {
+			return async ({ result, update }) => {
+				if (result.type === 'success') toast.success('Category added');
 				await update();
 				newName = '';
 				newCap = '';

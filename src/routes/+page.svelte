@@ -3,8 +3,10 @@
 	import { enhance } from '$app/forms';
 	import { getStoredPin, setStoredPin, clearStoredPin } from '$lib/pin-storage';
 	import { formatPKR } from '$lib/format';
+	import { toast } from '$lib/components/ui/sonner';
 	import KPICards from '$lib/components/KPICards.svelte';
 	import CategoryChart from '$lib/components/CategoryChart.svelte';
+	import AccountSpendChart from '$lib/components/AccountSpendChart.svelte';
 	import BudgetHealth from '$lib/components/BudgetHealth.svelte';
 	import TransactionTable from '$lib/components/TransactionTable.svelte';
 	import PinModal from '$lib/components/PinModal.svelte';
@@ -19,6 +21,7 @@
 	let expenseChangePct = $derived(data.expenseChangePct);
 	let monthlyBudgetCap = $derived(data.monthlyBudgetCap);
 	let categorySpend = $derived(data.categorySpend);
+	let accountSpend = $derived(data.accountSpend);
 	let weeklySpend = $derived(data.weeklySpend);
 
 	let range = $state<30 | 90>(30);
@@ -26,6 +29,7 @@
 
 	let transactions = $derived<Transaction[]>(
 		data.transactions.map((tx) => ({
+			id: tx.id,
 			name: tx.description ?? 'Transaction',
 			account: tx.account_name,
 			category: tx.is_transfer ? 'Transfer' : (tx.category_name ?? 'Uncategorized'),
@@ -147,7 +151,21 @@
 						<div class="font-mono text-[13px] font-medium text-ink">
 							{formatPKR(sub.amount)}
 						</div>
-						<form method="POST" action="/subscriptions?/confirmSubscriptionPayment" use:enhance>
+						<form
+						method="POST"
+						action="/subscriptions?/confirmSubscriptionPayment"
+						use:enhance={() => {
+							return async ({ result, update }) => {
+								if (result.type === 'success') toast.success('Subscription payment logged');
+								else if (result.type === 'failure') {
+									toast.error(
+										String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
+									);
+								}
+								await update();
+							};
+						}}
+					>
 							<input type="hidden" name="id" value={sub.id} />
 							<button
 								type="submit"
@@ -167,6 +185,8 @@
 	<CategoryChart categories={categorySpend} {range} onSetRange={(r) => (range = r)} />
 	<BudgetHealth {weeklySpend} {monthlyExpenses} {monthlyBudgetCap} />
 </section>
+
+<AccountSpendChart accounts={accountSpend} />
 
 <TransactionTable {transactions} viewAllHref="/transactions" />
 

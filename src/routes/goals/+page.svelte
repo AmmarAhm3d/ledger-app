@@ -3,6 +3,7 @@
 	import { tick } from 'svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
+	import { toast } from '$lib/components/ui/sonner';
 	import DatePicker from '$lib/components/DatePicker.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
 	import * as Select from '$lib/components/ui/select';
@@ -45,7 +46,8 @@
 					method="POST"
 					action="?/updateGoal"
 					use:enhance={() => {
-						return async ({ update }) => {
+						return async ({ result, update }) => {
+							if (result.type === 'success') toast.success('Goal updated');
 							await update({ reset: false });
 						};
 					}}
@@ -132,7 +134,17 @@
 					<span class="w-10 flex-none text-right font-mono text-[11.5px] font-medium text-dim">
 						{goal.progress}%
 					</span>
-					<form bind:this={removeFormEl.current} method="POST" action="?/removeGoal" use:enhance>
+					<form
+					bind:this={removeFormEl.current}
+					method="POST"
+					action="?/removeGoal"
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type === 'success') toast.success('Goal removed');
+							await update();
+						};
+					}}
+				>
 						<input type="hidden" name="id" value={goal.id} />
 						<ConfirmDeleteDialog
 							title="Remove {goal.name}?"
@@ -164,7 +176,8 @@
 		method="POST"
 		action="?/addGoal"
 		use:enhance={() => {
-			return async ({ update }) => {
+			return async ({ result, update }) => {
+				if (result.type === 'success') toast.success('Goal added');
 				await update();
 				newName = '';
 				newTargetAmount = '';

@@ -3,6 +3,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Select from '$lib/components/ui/select';
 	import DatePicker from '$lib/components/DatePicker.svelte';
+	import { toast } from '$lib/components/ui/sonner';
 	import type { Account } from '$lib/types';
 
 	interface Props {
@@ -66,6 +67,7 @@
 							? String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
 							: '';
 					if (result.type === 'success') {
+						toast.success('Transfer completed');
 						formEl?.reset();
 						fromAccountId = '';
 						toAccountId = '';

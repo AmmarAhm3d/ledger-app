@@ -4,6 +4,7 @@
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { formatPKR, initials } from '$lib/format';
 	import { pending } from '$lib/pending.svelte';
+	import { toast } from '$lib/components/ui/sonner';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -25,8 +26,9 @@
 	let errorMessage = $state('');
 	let savingIds = $state(new Set<number>());
 
-	function handleResult(result: { type: string; data?: Record<string, unknown> }) {
+	function handleResult(result: { type: string; data?: Record<string, unknown> }, successMessage?: string) {
 		errorMessage = result.type === 'failure' ? String(result.data?.message ?? 'Something went wrong') : '';
+		if (result.type === 'success' && successMessage) toast.success(successMessage);
 	}
 
 	let total = $derived(accounts.reduce((sum, a) => sum + a.balance, 0));
@@ -81,7 +83,7 @@
 						use:enhance={() => {
 							savingIds = new Set(savingIds).add(account.id);
 							return async ({ result, update }) => {
-								handleResult(result);
+								handleResult(result, 'Account renamed');
 								await update({ reset: false });
 								const next = new Set(savingIds);
 								next.delete(account.id);
@@ -127,7 +129,7 @@
 						use:enhance={() => {
 							savingIds = new Set(savingIds).add(account.id);
 							return async ({ result, update }) => {
-								handleResult(result);
+								handleResult(result, 'Balance updated');
 								await update({ reset: false });
 								const next = new Set(savingIds);
 								next.delete(account.id);
@@ -151,7 +153,7 @@
 						action="/?/removeAccount"
 						use:enhance={() => {
 							return async ({ result, update }) => {
-								handleResult(result);
+								handleResult(result, 'Account removed');
 								await update();
 							};
 						}}
@@ -184,7 +186,7 @@
 			use:enhance={() => {
 				pending.start('accounts');
 				return async ({ result, update }) => {
-					handleResult(result);
+					handleResult(result, 'Account added');
 					await update();
 					pending.end('accounts');
 					if (result.type === 'success') {

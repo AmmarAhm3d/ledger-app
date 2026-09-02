@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { Paperclip } from '@lucide/svelte';
+	import { Paperclip, Receipt } from '@lucide/svelte';
+	import { upload } from '@vercel/blob/client';
+	import { invalidateAll } from '$app/navigation';
 	import { formatPKR, initials } from '$lib/format';
 	import { pending } from '$lib/pending.svelte';
+	import { toast } from '$lib/components/ui/sonner';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import type { Transaction } from '$lib/types';
 
@@ -11,6 +14,32 @@
 	}
 
 	let { transactions, viewAllHref }: Props = $props();
+
+	let attachingIds = $state(new Set<number>());
+	let receiptInputEls: Record<number, HTMLInputElement | null> = {};
+
+	async function handleAttachReceipt(id: number, file: File) {
+		attachingIds = new Set(attachingIds).add(id);
+		try {
+			const blob = await upload(`receipts/${Date.now()}-${file.name}`, file, {
+				access: 'private',
+				handleUploadUrl: '/api/receipts/upload'
+			});
+			const formData = new FormData();
+			formData.set('id', String(id));
+			formData.set('receipt_url', blob.url);
+			const res = await fetch('/transactions?/attachReceipt', { method: 'POST', body: formData });
+			if (!res.ok) throw new Error('Failed to attach receipt');
+			toast.success('Receipt attached');
+			await invalidateAll();
+		} catch {
+			toast.error('Receipt upload failed — try a different file');
+		} finally {
+			const next = new Set(attachingIds);
+			next.delete(id);
+			attachingIds = next;
+		}
+	}
 
 	let rows = $derived(
 		transactions.map((tx) => ({
@@ -65,7 +94,7 @@
 					<Skeleton width="3.5rem" height="0.8rem" class="ml-auto" />
 				</div>
 			{/if}
-			{#each rows as tx (tx.name + tx.date + tx.account + tx.amount)}
+			{#each rows as tx (tx.id)}
 				<div
 					class="grid grid-cols-[minmax(0,2.2fr)_1.1fr_0.9fr_0.7fr_1fr] items-center gap-3 border-b border-panel-hover px-4.5 py-3 transition-colors duration-100 hover:bg-panel-2"
 				>
@@ -100,6 +129,27 @@
 								<Paperclip size={11} strokeWidth={2} />
 								Receipt
 							</span>
+						{:else}
+							<button
+								type="button"
+								title="Attach receipt"
+								disabled={attachingIds.has(tx.id)}
+								onclick={() => receiptInputEls[tx.id]?.click()}
+								class="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-subtle transition-colors duration-100 hover:bg-panel-strong hover:text-accent-hover disabled:opacity-50"
+							>
+								<Receipt size={12} strokeWidth={2} />
+							</button>
+							<input
+								bind:this={receiptInputEls[tx.id]}
+								type="file"
+								accept="image/png, image/jpeg, application/pdf"
+								class="sr-only"
+								onchange={(e) => {
+									const file = e.currentTarget.files?.[0];
+									e.currentTarget.value = '';
+									if (file) handleAttachReceipt(tx.id, file);
+								}}
+							/>
 						{/if}
 					</div>
 					<div

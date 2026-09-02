@@ -3,6 +3,7 @@
 	import { tick } from 'svelte';
 	import { Plus, Trash2 } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
+	import { toast } from '$lib/components/ui/sonner';
 	import DatePicker from '$lib/components/DatePicker.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
 	import Checkbox from '$lib/components/ui/checkbox.svelte';
@@ -84,7 +85,22 @@
 									{sub.name} · {formatPKR(sub.amount)}
 								</div>
 							</div>
-							<form method="POST" action="?/confirmSubscriptionPayment" use:enhance class="flex-none">
+							<form
+							method="POST"
+							action="?/confirmSubscriptionPayment"
+							use:enhance={() => {
+								return async ({ result, update }) => {
+									if (result.type === 'success') toast.success('Subscription payment logged');
+									else if (result.type === 'failure') {
+										toast.error(
+											String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
+										);
+									}
+									await update();
+								};
+							}}
+							class="flex-none"
+						>
 								<input type="hidden" name="id" value={sub.id} />
 								<button
 									type="submit"
@@ -132,7 +148,8 @@
 						method="POST"
 						action="?/updateSubscription"
 						use:enhance={() => {
-							return async ({ update }) => {
+							return async ({ result, update }) => {
+								if (result.type === 'success') toast.success('Subscription updated');
 								await update({ reset: false });
 							};
 						}}
@@ -252,7 +269,17 @@
 							</label>
 						</div>
 					</form>
-					<form bind:this={removeFormEl.current} method="POST" action="?/removeSubscription" use:enhance>
+					<form
+					bind:this={removeFormEl.current}
+					method="POST"
+					action="?/removeSubscription"
+					use:enhance={() => {
+						return async ({ result, update }) => {
+							if (result.type === 'success') toast.success('Subscription removed');
+							await update();
+						};
+					}}
+				>
 						<input type="hidden" name="id" value={sub.id} />
 						<ConfirmDeleteDialog
 							title="Remove {sub.name}?"
@@ -280,7 +307,8 @@
 			method="POST"
 			action="?/addSubscription"
 			use:enhance={() => {
-				return async ({ update }) => {
+				return async ({ result, update }) => {
+					if (result.type === 'success') toast.success('Subscription added');
 					await update();
 					newName = '';
 					newAmount = '';

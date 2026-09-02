@@ -8,6 +8,7 @@
 		PiggyBank,
 		Settings,
 		CreditCard,
+		PieChart,
 		LogOut,
 		X
 	} from '@lucide/svelte';
@@ -32,6 +33,7 @@
 		{ href: '/receipts', label: 'Receipts', icon: Receipt },
 		{ href: '/subscriptions', label: 'Subscriptions', icon: Repeat },
 		{ href: '/goals', label: 'Goals', icon: PiggyBank },
+		{ href: '/allocation', label: 'Allocation', icon: PieChart },
 		{ href: '/settings', label: 'Settings', icon: Settings }
 	];
 

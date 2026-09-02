@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Paperclip, Import } from '@lucide/svelte';
 	import { enhance } from '$app/forms';
+	import { upload } from '@vercel/blob/client';
 	import { toast } from '$lib/components/ui/sonner';
 	import { pending } from '$lib/pending.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -112,9 +113,25 @@
 			bind:this={formEl}
 			method="POST"
 			action="/?/addTransaction"
-			enctype="multipart/form-data"
 			class="flex flex-col gap-3.75"
-			use:enhance={() => {
+			use:enhance={async ({ formData, cancel }) => {
+				errorMessage = '';
+				const file = fileInputEl?.files?.[0];
+				formData.delete('receipt');
+				if (file) {
+					try {
+						const blob = await upload(`receipts/${Date.now()}-${file.name}`, file, {
+							access: 'private',
+							handleUploadUrl: '/api/receipts/upload'
+						});
+						formData.set('receipt_url', blob.url);
+					} catch {
+						cancel();
+						errorMessage = 'Receipt upload failed — try a different file, or save without it and attach one later.';
+						return;
+					}
+				}
+
 				submitting = true;
 				pending.start('transactions');
 				return async ({ result, update }) => {
@@ -124,6 +141,7 @@
 							? String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
 							: '';
 					if (result.type === 'success') {
+						toast.success('Transaction added');
 						resetForm();
 						onClose();
 					}
@@ -191,7 +209,13 @@
 			<div class="grid grid-cols-2 gap-3">
 				<div class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold text-dim">Account</span>
-					<Select.Root type="single" name="account_id" required bind:value={accountId}>
+					<Select.Root
+						type="single"
+						name="account_id"
+						required
+						items={accounts.map((a) => ({ value: String(a.id), label: a.name }))}
+						bind:value={accountId}
+					>
 						<Select.Trigger>
 							<Select.Value placeholder="Select account" />
 						</Select.Trigger>
@@ -204,7 +228,13 @@
 				</div>
 				<div class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold text-dim">Category</span>
-					<Select.Root type="single" name="category_id" required bind:value={categoryId}>
+					<Select.Root
+						type="single"
+						name="category_id"
+						required
+						items={categories.map((c) => ({ value: String(c.id), label: c.name }))}
+						bind:value={categoryId}
+					>
 						<Select.Trigger>
 							<Select.Value placeholder="Select category" />
 						</Select.Trigger>
@@ -231,7 +261,6 @@
 			<input
 				bind:this={fileInputEl}
 				id="tx-receipt"
-				name="receipt"
 				type="file"
 				accept="image/png, image/jpeg, application/pdf"
 				class="sr-only"

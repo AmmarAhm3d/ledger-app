@@ -6,7 +6,7 @@ import { parseAmount, parseId } from '$lib/server/form-utils';
 import { logger } from '$lib/server/logger';
 import { logAudit } from '$lib/server/audit';
 import { validate } from '$lib/server/result';
-import { deleteTransactionsSchema, updateTransactionSchema } from '$lib/schema';
+import { attachReceiptSchema, deleteTransactionsSchema, updateTransactionSchema } from '$lib/schema';
 import { getDueSubscriptions } from '$lib/server/subscriptions';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -210,6 +210,35 @@ export const actions: Actions = {
 			});
 			throw error;
 		}
+	},
+
+	/** Attaches a receipt (already uploaded client-side to Blob) to an existing transaction. */
+	attachReceipt: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, { message: 'Unauthorized' });
+		const userId = locals.user.id;
+		const form = await request.formData();
+
+		const result = validate(attachReceiptSchema, {
+			id: parseId(form.get('id')),
+			receipt_url: form.get('receipt_url')
+		});
+		if (!result.success) return fail(400, { message: result.error });
+		const { id, receipt_url } = result.data;
+
+		const [existing] = await db
+			.select({ id: transactions.id })
+			.from(transactions)
+			.where(
+				and(eq(transactions.id, id), eq(transactions.user_id, userId), isNull(transactions.deleted_at))
+			);
+		if (!existing) return fail(400, { message: 'Invalid transaction' });
+
+		await db
+			.update(transactions)
+			.set({ has_receipt: true, receipt_url })
+			.where(eq(transactions.id, id));
+
+		logger.info('Receipt attached to transaction', { userId, transactionId: id });
 	},
 
 	deleteTransactions: async ({ request, locals }) => {

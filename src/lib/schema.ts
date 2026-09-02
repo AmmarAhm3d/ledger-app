@@ -119,6 +119,12 @@ export const updateTransactionSchema = z.object({
 });
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
 
+export const attachReceiptSchema = z.object({
+	id: positiveIntId('Invalid transaction id'),
+	receipt_url: z.string().trim().url('Invalid receipt upload')
+});
+export type AttachReceiptInput = z.infer<typeof attachReceiptSchema>;
+
 export const deleteTransactionsSchema = z.object({
 	ids: z.array(positiveIntId('Invalid transaction id')).min(1, 'No transactions selected')
 });

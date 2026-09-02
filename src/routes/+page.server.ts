@@ -1,19 +1,15 @@
 import { error, fail } from '@sveltejs/kit';
-import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
-import { put } from '@vercel/blob';
-import { env } from '$env/dynamic/private';
+import { and, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { accounts, categories, transactions } from '$lib/server/db/schema';
 import { parseAmount, parseOptionalAmount, parseId } from '$lib/server/form-utils';
 import { logger } from '$lib/server/logger';
 import { logAudit } from '$lib/server/audit';
-import { err, ok, validate, type Result } from '$lib/server/result';
+import { validate } from '$lib/server/result';
 import {
 	addAccountSchema,
 	addTransactionSchema,
-	ALLOWED_RECEIPT_TYPES,
 	bulkImportYamlSchema,
-	receiptFileSchema,
 	removeAccountSchema,
 	transferSchema,
 	updateAccountBalanceSchema,
@@ -21,11 +17,10 @@ import {
 } from '$lib/schema';
 import { parseAndValidateBulkImport } from '$lib/bulk-import';
 import { getDueSubscriptions } from '$lib/server/subscriptions';
-import type { CategorySpend } from '$lib/types';
+import type { AccountSpend, CategorySpend } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 const CATEGORY_COLORS = ['#F4F4F5', '#818CF8', '#A5B4FC', '#6366F1', '#4338CA', '#3F3F46'];
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
 	if (!locals.user) throw error(401, 'Unauthorized');
@@ -34,7 +29,6 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
 	const now = new Date();
 	const currentMonthPrefix = now.toISOString().slice(0, 7);
-	const today = new Date(now.toISOString().slice(0, 10));
 
 	const [currentYear, currentMonth] = currentMonthPrefix.split('-').map(Number);
 	const previousMonthPrefix =
@@ -73,17 +67,11 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 	let previousMonthIncome = 0;
 	let previousMonthExpenses = 0;
 	const categoryTotals = new Map<number, { name: string; total: number }>();
+	const accountTotals = new Map<number, { name: string; total: number }>();
 	const weeklySpend = [0, 0, 0, 0];
 
 	for (const tx of transactionRows) {
 		if (tx.is_transfer) continue;
-
-		if (tx.amount < 0) {
-			const daysAgo = Math.floor((today.getTime() - new Date(tx.date).getTime()) / DAY_MS);
-			if (daysAgo >= 0 && daysAgo < 28) {
-				weeklySpend[3 - Math.floor(daysAgo / 7)] += Math.abs(tx.amount);
-			}
-		}
 
 		if (tx.date.startsWith(previousMonthPrefix)) {
 			if (tx.amount > 0) {
@@ -97,14 +85,26 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
 		if (tx.amount > 0) {
 			monthlyIncome += tx.amount;
-		} else if (tx.amount < 0 && tx.category_id != null && tx.category_name != null) {
+		} else if (tx.amount < 0) {
 			const spend = Math.abs(tx.amount);
-			monthlyExpenses += spend;
-			const existing = categoryTotals.get(tx.category_id);
-			if (existing) {
-				existing.total += spend;
+			const dayOfMonth = Number(tx.date.slice(8, 10));
+			weeklySpend[Math.min(3, Math.floor((dayOfMonth - 1) / 7))] += spend;
+
+			const existingAccount = accountTotals.get(tx.account_id);
+			if (existingAccount) {
+				existingAccount.total += spend;
 			} else {
-				categoryTotals.set(tx.category_id, { name: tx.category_name, total: spend });
+				accountTotals.set(tx.account_id, { name: tx.account_name, total: spend });
+			}
+
+			if (tx.category_id != null && tx.category_name != null) {
+				monthlyExpenses += spend;
+				const existing = categoryTotals.get(tx.category_id);
+				if (existing) {
+					existing.total += spend;
+				} else {
+					categoryTotals.set(tx.category_id, { name: tx.category_name, total: spend });
+				}
 			}
 		}
 	}
@@ -125,6 +125,10 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 			color: CATEGORY_COLORS[i % CATEGORY_COLORS.length]
 		}));
 
+	const accountSpend: AccountSpend[] = [...accountTotals.values()]
+		.sort((a, b) => b.total - a.total)
+		.map((a) => ({ name: a.name, baseAmount: a.total }));
+
 	const monthlyBudgetCap = categoryRows.reduce((sum, c) => sum + c.monthly_cap, 0);
 	const suggestedTransactions = await getDueSubscriptions(userId);
 
@@ -138,35 +142,11 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		incomeChangePct,
 		expenseChangePct,
 		categorySpend,
+		accountSpend,
 		monthlyBudgetCap,
 		weeklySpend
 	};
 };
-
-/**
- * Uploads a receipt file to Vercel Blob. Returns a Result rather than throwing,
- * since callers (the addTransaction action) need to turn a failure into a
- * `fail(400, { message })` while a success just carries the blob URL onward.
- */
-async function uploadReceipt(receipt: File): Promise<Result<string, string>> {
-	const parsed = validate(receiptFileSchema, receipt);
-	if (!parsed.success) return err(parsed.error);
-
-	const extension = ALLOWED_RECEIPT_TYPES[receipt.type];
-	try {
-		const blob = await put(`receipts/${Date.now()}.${extension}`, receipt, {
-			access: 'private',
-			addRandomSuffix: true,
-			multipart: true,
-			oidcToken: env.VERCEL_OIDC_TOKEN,
-			storeId: env.BLOB_STORE_ID
-		});
-		return ok(blob.url);
-	} catch (error) {
-		logger.error('Failed to upload receipt to blob storage', { error });
-		return err('Failed to upload receipt');
-	}
-}
 
 export const actions: Actions = {
 	addAccount: async ({ request, locals }) => {
@@ -363,7 +343,10 @@ export const actions: Actions = {
 		if (!locals.user) return fail(401, { message: 'Unauthorized' });
 		const userId = locals.user.id;
 		const formData = await request.formData();
-		const receipt = formData.get('receipt');
+		const receiptUrlInput = formData.get('receipt_url')?.toString().trim() || null;
+		if (receiptUrlInput && !receiptUrlInput.startsWith('https://')) {
+			return fail(400, { message: 'Invalid receipt upload' });
+		}
 
 		const result = validate(addTransactionSchema, {
 			amount: parseAmount(formData.get('amount')),
@@ -407,12 +390,7 @@ export const actions: Actions = {
 			);
 		if (!ownedCategory) return fail(400, { message: 'Invalid category' });
 
-		let receiptUrl: string | null = null;
-		if (receipt instanceof File && receipt.size > 0) {
-			const uploadResult = await uploadReceipt(receipt);
-			if (!uploadResult.success) return fail(400, { message: uploadResult.error });
-			receiptUrl = uploadResult.data;
-		}
+		const receiptUrl = receiptUrlInput;
 
 		try {
 			await db.transaction(async (tx) => {
@@ -621,10 +599,59 @@ export const actions: Actions = {
 			return fail(400, { message: 'No transactions found to import' });
 		}
 
+		// Skip entries that already exist in the ledger (same date/amount/account/
+		// description) so re-pasting the same notes twice doesn't double-post them.
+		const importDates = [...new Set(entries.map((e) => e.date))];
+		const existingRows =
+			importDates.length > 0
+				? await db
+						.select({
+							amount: transactions.amount,
+							date: transactions.date,
+							description: transactions.description,
+							account_id: transactions.account_id
+						})
+						.from(transactions)
+						.where(
+							and(
+								eq(transactions.user_id, userId),
+								isNull(transactions.deleted_at),
+								inArray(transactions.date, importDates)
+							)
+						)
+				: [];
+
+		const dupeKey = (date: string, amount: number, accountId: number, description: string) =>
+			`${date}|${amount}|${accountId}|${description.trim().toLowerCase()}`;
+
+		const seen = new Set(
+			existingRows.map((row) =>
+				dupeKey(row.date, row.amount, row.account_id, row.description ?? '')
+			)
+		);
+
+		let skipped = 0;
+		const toImport = entries.filter((entry) => {
+			const signedAmount = entry.type === 'income' ? Math.abs(entry.amount) : -Math.abs(entry.amount);
+			const key = dupeKey(entry.date, signedAmount, entry.account_id, entry.description);
+			if (seen.has(key)) {
+				skipped++;
+				return false;
+			}
+			seen.add(key);
+			return true;
+		});
+
+		if (toImport.length === 0) {
+			return fail(400, {
+				message: `All ${entries.length} entries already exist in your ledger — nothing imported`
+			});
+		}
+
 		try {
 			await db.transaction(async (tx) => {
 				const balanceDeltas = new Map<number, number>();
-				const values = entries.map((entry) => {
+				const values = toImport.map((entry) => {
 					const signedAmount =
 						entry.type === 'income' ? Math.abs(entry.amount) : -Math.abs(entry.amount);
 					balanceDeltas.set(
@@ -660,10 +687,12 @@ export const actions: Actions = {
 					});
 				}
 			});
-			logger.info('Bulk import completed', { userId, count: entries.length });
+			logger.info('Bulk import completed', { userId, count: toImport.length, skipped });
 		} catch (error) {
 			logger.error('Failed to bulk import transactions', { userId, error });
 			throw error;
 		}
+
+		return { imported: toImport.length, skipped };
 	}
 };

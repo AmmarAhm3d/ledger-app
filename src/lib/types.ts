@@ -21,7 +21,13 @@ export interface CategorySpend {
 	color: string;
 }
 
+export interface AccountSpend {
+	name: string;
+	baseAmount: number;
+}
+
 export interface Transaction {
+	id: number;
 	name: string;
 	account: string;
 	category: string;

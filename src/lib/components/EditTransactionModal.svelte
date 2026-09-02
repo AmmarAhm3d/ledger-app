@@ -3,6 +3,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Select from '$lib/components/ui/select';
 	import DatePicker from '$lib/components/DatePicker.svelte';
+	import { toast } from '$lib/components/ui/sonner';
 	import type { Account, Category } from '$lib/types';
 	import type { SearchResult } from '$lib/search-transactions';
 
@@ -67,7 +68,10 @@
 											'Something went wrong'
 									)
 								: '';
-						if (result.type === 'success') onClose();
+						if (result.type === 'success') {
+							toast.success('Transaction updated');
+							onClose();
+						}
 						await update({ reset: false });
 					};
 				}}

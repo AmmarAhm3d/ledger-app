@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { Copy, Check } from '@lucide/svelte';
+	import { toast } from '$lib/components/ui/sonner';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Select from '$lib/components/ui/select';
 	import Textarea from '$lib/components/ui/textarea.svelte';
@@ -347,6 +348,12 @@
 							serverMessage = data?.message ?? 'Something went wrong';
 							serverErrors = data?.errors ?? [];
 						} else if (result.type === 'success') {
+							const data = result.data as { imported?: number; skipped?: number } | undefined;
+							toast.success(
+								data?.skipped
+									? `Imported ${data.imported} — skipped ${data.skipped} already in your ledger`
+									: `Imported ${data?.imported ?? 0} transaction${data?.imported === 1 ? '' : 's'}`
+							);
 							reset();
 							onClose();
 						}

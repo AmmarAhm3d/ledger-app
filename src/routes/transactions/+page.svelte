@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { page } from '$app/state';
 	import { tick } from 'svelte';
-	import { Paperclip, Repeat, Search, Trash2 } from '@lucide/svelte';
+	import { Paperclip, Receipt, Repeat, Search, Trash2 } from '@lucide/svelte';
+	import { upload } from '@vercel/blob/client';
 	import { formatPKR } from '$lib/format';
 	import { pending } from '$lib/pending.svelte';
+	import { toast } from '$lib/components/ui/sonner';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import DatePicker from '$lib/components/DatePicker.svelte';
 	import ConfirmDeleteDialog from '$lib/components/ConfirmDeleteDialog.svelte';
@@ -66,6 +68,32 @@
 		updateParams({ page: targetPage > 1 ? String(targetPage) : null }, false);
 	}
 
+	let attachingIds = $state(new Set<number>());
+	let receiptInputEls: Record<number, HTMLInputElement | null> = {};
+
+	async function handleAttachReceipt(id: number, file: File) {
+		attachingIds = new Set(attachingIds).add(id);
+		try {
+			const blob = await upload(`receipts/${Date.now()}-${file.name}`, file, {
+				access: 'private',
+				handleUploadUrl: '/api/receipts/upload'
+			});
+			const formData = new FormData();
+			formData.set('id', String(id));
+			formData.set('receipt_url', blob.url);
+			const res = await fetch('?/attachReceipt', { method: 'POST', body: formData });
+			if (!res.ok) throw new Error('Failed to attach receipt');
+			toast.success('Receipt attached');
+			await invalidateAll();
+		} catch {
+			toast.error('Receipt upload failed — try a different file');
+		} finally {
+			const next = new Set(attachingIds);
+			next.delete(id);
+			attachingIds = next;
+		}
+	}
+
 	let rangeStart = $derived(
 		data.pagination.totalCount === 0 ? 0 : (data.pagination.page - 1) * data.pagination.limit + 1
 	);
@@ -97,7 +125,21 @@
 						<div class="font-mono text-[13px] font-medium text-ink">
 							{formatPKR(sub.amount)}
 						</div>
-						<form method="POST" action="/subscriptions?/confirmSubscriptionPayment" use:enhance>
+						<form
+						method="POST"
+						action="/subscriptions?/confirmSubscriptionPayment"
+						use:enhance={() => {
+							return async ({ result, update }) => {
+								if (result.type === 'success') toast.success('Subscription payment logged');
+								else if (result.type === 'failure') {
+									toast.error(
+										String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
+									);
+								}
+								await update();
+							};
+						}}
+					>
 							<input type="hidden" name="id" value={sub.id} />
 							<button
 								type="submit"
@@ -126,8 +168,12 @@
 				action="?/deleteTransactions"
 				use:enhance={() => {
 					deleting = true;
-					return async ({ update }) => {
+					const count = selectedIds.size;
+					return async ({ result, update }) => {
 						deleting = false;
+						if (result.type === 'success') {
+							toast.success(`${count} transaction${count === 1 ? '' : 's'} deleted`);
+						}
 						selectedIds = new Set();
 						await update();
 					};
@@ -261,9 +307,17 @@
 						bind:this={rowFormEl.current}
 						method="POST"
 						action="?/updateTransaction"
-						use:enhance={() => {
+						use:enhance={({ action }) => {
 							savingIds = new Set(savingIds).add(tx.id);
-							return async ({ update }) => {
+							const isTrackAsSubscription = action.search.includes('createSubscriptionFromTransaction');
+							return async ({ result, update }) => {
+								if (result.type === 'success') {
+									toast.success(isTrackAsSubscription ? 'Tracked as subscription' : 'Transaction updated');
+								} else if (result.type === 'failure' && isTrackAsSubscription) {
+									toast.error(
+										String((result.data as Record<string, unknown> | undefined)?.message ?? 'Something went wrong')
+									);
+								}
 								await update({ reset: false });
 								const next = new Set(savingIds);
 								next.delete(tx.id);
@@ -348,6 +402,27 @@
 									<Paperclip size={11} strokeWidth={2} />
 									View
 								</a>
+							{:else}
+								<button
+									type="button"
+									title="Attach receipt"
+									disabled={attachingIds.has(tx.id)}
+									onclick={() => receiptInputEls[tx.id]?.click()}
+									class="inline-flex h-6 w-6 flex-none items-center justify-center rounded-md text-subtle transition-colors duration-100 hover:bg-panel-strong hover:text-accent-hover disabled:opacity-50"
+								>
+									<Receipt size={12} strokeWidth={2} />
+								</button>
+								<input
+									bind:this={receiptInputEls[tx.id]}
+									type="file"
+									accept="image/png, image/jpeg, application/pdf"
+									class="sr-only"
+									onchange={(e) => {
+										const file = e.currentTarget.files?.[0];
+										e.currentTarget.value = '';
+										if (file) handleAttachReceipt(tx.id, file);
+									}}
+								/>
 							{/if}
 							{#if !tx.is_transfer && !linkedIds.has(tx.id)}
 								<button
