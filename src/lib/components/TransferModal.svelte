@@ -78,7 +78,7 @@
 				};
 			}}
 		>
-			<div class="grid grid-cols-2 gap-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<div class="flex flex-col gap-1.5">
 					<span class="text-xs font-semibold text-dim">From account</span>
 					<Select.Root type="single" name="from_account_id" required bind:value={fromAccountId}>
@@ -114,7 +114,7 @@
 					</Select.Root>
 				</div>
 			</div>
-			<div class="grid grid-cols-2 gap-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 				<div class="flex flex-col gap-1.5">
 					<label for="transfer-amount" class="text-xs font-semibold text-dim">Amount</label>
 					<input

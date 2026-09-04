@@ -87,7 +87,7 @@
 						class="w-full rounded-lg border border-border-strong bg-bg px-2.75 py-2.25 text-[13px] text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/18"
 					/>
 				</div>
-				<div class="grid grid-cols-2 gap-3">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 					<div class="flex flex-col gap-1.5">
 						<label for="edit-tx-amount" class="text-xs font-semibold text-dim">Amount</label>
 						<input
@@ -105,7 +105,7 @@
 						<DatePicker name="date" bind:value={date} required class="w-full" />
 					</div>
 				</div>
-				<div class="grid grid-cols-2 gap-3">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 					<div class="flex flex-col gap-1.5">
 						<span class="text-xs font-semibold text-dim">Account</span>
 						<Select.Root

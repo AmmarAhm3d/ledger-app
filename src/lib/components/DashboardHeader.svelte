@@ -1,10 +1,14 @@
 <script lang="ts">
-	import { Search, Bell, Plus, Menu, ArrowLeftRight, Import, Loader2 } from '@lucide/svelte';
+	import { Search, Bell, Plus, Menu, ArrowLeftRight, Import, Loader2, X } from '@lucide/svelte';
 	import { formatPKR } from '$lib/format';
 	import * as Popover from '$lib/components/ui/popover';
 	import Badge from '$lib/components/ui/badge.svelte';
 	import type { SearchResult } from '$lib/search-transactions';
 	import type { DueSubscription } from '$lib/server/subscriptions';
+
+	function autofocus(node: HTMLElement) {
+		node.focus();
+	}
 
 	interface Props {
 		title: string;
@@ -66,9 +70,16 @@
 		if (tx.is_transfer) return;
 		onSelectTransaction(tx);
 		searchOpen = false;
+		mobileSearchOpen = false;
 	}
 
 	let bellOpen = $state(false);
+	let mobileSearchOpen = $state(false);
+
+	function closeMobileSearch() {
+		mobileSearchOpen = false;
+		searchOpen = false;
+	}
 </script>
 
 <header
@@ -87,6 +98,14 @@
 		<div class="mt-0.5 truncate text-[11.5px] text-muted sm:text-[12.5px]">{subtitle}</div>
 	</div>
 	<div class="ml-auto flex items-center gap-2 sm:gap-2.5">
+		<button
+			type="button"
+			onclick={() => (mobileSearchOpen = true)}
+			aria-label="Search transactions"
+			class="flex h-8.5 w-8.5 flex-none items-center justify-center rounded-[9px] border border-border bg-panel text-dim transition-colors duration-100 hover:bg-panel-hover md:hidden"
+		>
+			<Search size={15} strokeWidth={1.9} />
+		</button>
 		<div class="relative hidden md:block">
 			<div
 				class="flex w-[160px] items-center gap-1.5 rounded-[9px] border border-border bg-panel px-2.5 py-1.5 lg:w-[210px]"
@@ -110,51 +129,23 @@
 				<div
 					class="absolute top-full right-0 z-50 mt-1.5 w-80 overflow-hidden rounded-[13px] border border-border-strong bg-panel-2 p-1 shadow-2xl"
 				>
-					{#if searchLoading}
-						<div class="flex items-center gap-2 px-2.5 py-3 text-[12px] text-muted">
-							<Loader2 size={13} strokeWidth={2} class="animate-spin" />
-							Searching…
-						</div>
-					{:else if searchResults.length === 0}
-						<div class="px-2.5 py-3 text-[12px] text-muted">No matching transactions.</div>
-					{:else}
-						{#each searchResults as tx (tx.id)}
-							<button
-								type="button"
-								onclick={() => selectResult(tx)}
-								disabled={tx.is_transfer}
-								class="flex w-full items-center justify-between gap-2.5 rounded-lg px-2.25 py-2 text-left transition-colors duration-100 hover:bg-panel-hover disabled:cursor-not-allowed disabled:opacity-50"
-							>
-								<div class="min-w-0">
-									<div class="truncate text-[12.5px] font-medium text-ink">
-										{tx.description ?? (tx.is_transfer ? 'Transfer' : 'Transaction')}
-									</div>
-									<div class="truncate text-[11px] text-muted">{tx.account_name} · {tx.date}</div>
-								</div>
-								<div
-									class="flex-none font-mono text-[12.5px] font-medium"
-									class:text-green={tx.amount > 0}
-									class:text-ink={tx.amount <= 0}
-								>
-									{(tx.amount > 0 ? '+' : '−') + formatPKR(Math.abs(tx.amount))}
-								</div>
-							</button>
-						{/each}
-					{/if}
+					{@render searchResultsList()}
 				</div>
 			{/if}
 		</div>
 		<Popover.Root bind:open={bellOpen}>
 			<Popover.Trigger
 				aria-label="Notifications"
-				class="relative hidden h-8.5 w-8.5 items-center justify-center rounded-[9px] border border-border bg-panel text-dim transition-colors duration-100 hover:bg-panel-hover sm:flex"
+				class="relative flex h-8.5 w-8.5 flex-none items-center justify-center rounded-[9px] border border-border bg-panel text-dim transition-colors duration-100 hover:bg-panel-hover"
 			>
 				<Bell size={15} strokeWidth={1.9} />
 				{#if suggestedTransactions.length > 0}
-					<Badge class="absolute -top-1 -right-1">{suggestedTransactions.length}</Badge>
+					<Badge class="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3"
+						>{suggestedTransactions.length}</Badge
+					>
 				{/if}
 			</Popover.Trigger>
-			<Popover.Content class="w-80 p-1" align="end">
+			<Popover.Content class="w-80 max-w-[calc(100vw-2rem)] p-1" align="end">
 				<div class="px-2.5 pt-2 pb-1.5 text-[12px] font-semibold text-ink">
 					Due subscriptions
 				</div>
@@ -214,3 +205,72 @@
 		</button>
 	</div>
 </header>
+
+{#snippet searchResultsList()}
+	{#if searchLoading}
+		<div class="flex items-center gap-2 px-2.5 py-3 text-[12px] text-muted">
+			<Loader2 size={13} strokeWidth={2} class="animate-spin" />
+			Searching…
+		</div>
+	{:else if searchResults.length === 0}
+		<div class="px-2.5 py-3 text-[12px] text-muted">No matching transactions.</div>
+	{:else}
+		{#each searchResults as tx (tx.id)}
+			<button
+				type="button"
+				onclick={() => selectResult(tx)}
+				disabled={tx.is_transfer}
+				class="flex w-full items-center justify-between gap-2.5 rounded-lg px-2.25 py-2 text-left transition-colors duration-100 hover:bg-panel-hover disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				<div class="min-w-0">
+					<div class="truncate text-[12.5px] font-medium text-ink">
+						{tx.description ?? (tx.is_transfer ? 'Transfer' : 'Transaction')}
+					</div>
+					<div class="truncate text-[11px] text-muted">{tx.account_name} · {tx.date}</div>
+				</div>
+				<div
+					class="flex-none font-mono text-[12.5px] font-medium"
+					class:text-green={tx.amount > 0}
+					class:text-ink={tx.amount <= 0}
+				>
+					{(tx.amount > 0 ? '+' : '−') + formatPKR(Math.abs(tx.amount))}
+				</div>
+			</button>
+		{/each}
+	{/if}
+{/snippet}
+
+{#if mobileSearchOpen}
+	<div class="fixed inset-0 z-50 flex flex-col bg-bg md:hidden">
+		<div class="flex items-center gap-2 border-b border-border px-4 py-3.5">
+			<div
+				class="flex flex-1 items-center gap-1.5 rounded-[9px] border border-border bg-panel px-2.5 py-2"
+			>
+				<Search size={14} strokeWidth={2} class="flex-none text-muted" />
+				<input
+					type="search"
+					use:autofocus
+					aria-label="Search transactions"
+					placeholder="Search transactions"
+					value={searchQuery}
+					oninput={onSearchInput}
+					onkeydown={(e) => e.key === 'Escape' && closeMobileSearch()}
+					class="w-full border-none bg-transparent text-[13px] text-ink outline-none placeholder:text-faint"
+				/>
+			</div>
+			<button
+				type="button"
+				onclick={closeMobileSearch}
+				aria-label="Close search"
+				class="flex h-8.5 w-8.5 flex-none items-center justify-center rounded-[9px] text-dim transition-colors duration-100 hover:bg-panel-hover"
+			>
+				<X size={16} strokeWidth={1.9} />
+			</button>
+		</div>
+		{#if searchQuery.trim()}
+			<div class="flex-1 overflow-y-auto p-1">
+				{@render searchResultsList()}
+			</div>
+		{/if}
+	</div>
+{/if}

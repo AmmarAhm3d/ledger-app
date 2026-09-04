@@ -43,13 +43,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <Dialog.Root {open} onOpenChange={(next) => !next && onClose()}>
-	<Dialog.Content
-		maxWidth="sm:max-w-[340px]"
-		class="items-center gap-4 rounded-t-3xl border-none p-6 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:rounded-3xl sm:border sm:border-border-strong sm:pb-6"
-	>
-		<!-- Drag handle for mobile bottom sheet appearance -->
-		<div class="-mt-1 mb-1 h-1 w-10 rounded-full bg-border-strong sm:hidden"></div>
-
+	<Dialog.Content maxWidth="sm:max-w-[340px]" class="items-center gap-4">
 		<div
 			class="flex h-11 w-11 items-center justify-center rounded-2xl border border-accent/20 bg-accent/10 text-accent shadow-sm"
 		>

@@ -35,7 +35,7 @@
 </script>
 
 <Dialog.Root {open} onOpenChange={(next) => !next && onClose()}>
-	<Dialog.Content maxWidth="max-w-110">
+	<Dialog.Content maxWidth="sm:max-w-110">
 		<div>
 			<Dialog.Title>Accounts</Dialog.Title>
 			<Dialog.Description>

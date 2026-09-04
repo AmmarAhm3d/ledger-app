@@ -58,9 +58,9 @@
 {/if}
 
 <aside
-	class="fixed inset-y-0 left-0 z-50 flex h-screen w-[244px] flex-none flex-col gap-6.5 border-r border-border bg-panel px-3.5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] transition-transform duration-200 lg:sticky lg:top-0 lg:translate-x-0 {open
-		? 'translate-x-0'
-		: '-translate-x-full'}"
+	class="fixed inset-y-0 left-0 z-50 flex h-screen w-[244px] flex-none flex-col gap-6.5 border-r border-border bg-panel px-3.5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] transition-transform duration-200 lg:sticky lg:top-0 lg:visible lg:translate-x-0 {open
+		? 'visible translate-x-0'
+		: 'invisible -translate-x-full'}"
 >
 	<div class="flex items-center gap-2.5 px-2">
 		<div class="flex h-7 w-7 items-center justify-center rounded-lg bg-ink">

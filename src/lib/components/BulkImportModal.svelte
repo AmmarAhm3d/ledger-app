@@ -125,7 +125,7 @@
 </script>
 
 <Dialog.Root {open} onOpenChange={(next) => !next && handleCancel()}>
-	<Dialog.Content maxWidth="max-w-165">
+	<Dialog.Content maxWidth="sm:max-w-165">
 		<Dialog.Header>
 			<div>
 				<Dialog.Title>Bulk import transactions</Dialog.Title>
