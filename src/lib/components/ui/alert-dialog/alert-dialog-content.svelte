@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { AlertDialog as AlertDialogPrimitive } from 'bits-ui';
 	import { cn } from '$lib/utils';
+	import { dragToDismiss } from '$lib/actions/drag-to-dismiss';
 	import DialogOverlay from '../dialog/dialog-overlay.svelte';
 	import type { Snippet } from 'svelte';
 
@@ -10,6 +11,8 @@
 		children,
 		...restProps
 	}: AlertDialogPrimitive.ContentProps & { children: Snippet } = $props();
+
+	let cancelRef = $state<HTMLElement | null>(null);
 </script>
 
 <AlertDialogPrimitive.Portal>
@@ -22,7 +25,11 @@
 		)}
 		{...restProps}
 	>
-		<div class="-mt-1.5 mb-1 h-1 w-10 flex-none self-center rounded-full bg-border-strong sm:hidden"></div>
+		<AlertDialogPrimitive.Cancel bind:ref={cancelRef} tabindex={-1} aria-hidden="true" class="hidden" />
+		<div
+			class="-mt-1.5 mb-1 h-1 w-10 flex-none touch-none self-center rounded-full bg-border-strong sm:hidden"
+			use:dragToDismiss={{ getSheet: () => ref, onDismiss: () => cancelRef?.click() }}
+		></div>
 		{@render children()}
 	</AlertDialogPrimitive.Content>
 </AlertDialogPrimitive.Portal>

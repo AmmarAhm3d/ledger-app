@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Dialog as DialogPrimitive } from 'bits-ui';
 	import { cn } from '$lib/utils';
+	import { dragToDismiss } from '$lib/actions/drag-to-dismiss';
 	import DialogOverlay from './dialog-overlay.svelte';
 	import type { Snippet } from 'svelte';
 
@@ -11,6 +12,8 @@
 		maxWidth = 'sm:max-w-108',
 		...restProps
 	}: DialogPrimitive.ContentProps & { children: Snippet; maxWidth?: string } = $props();
+
+	let closeRef = $state<HTMLElement | null>(null);
 </script>
 
 <DialogPrimitive.Portal>
@@ -24,7 +27,11 @@
 		)}
 		{...restProps}
 	>
-		<div class="-mt-1.5 mb-1 h-1 w-10 flex-none self-center rounded-full bg-border-strong sm:hidden"></div>
+		<DialogPrimitive.Close bind:ref={closeRef} tabindex={-1} aria-hidden="true" class="hidden" />
+		<div
+			class="-mt-1.5 mb-1 h-1 w-10 flex-none touch-none self-center rounded-full bg-border-strong sm:hidden"
+			use:dragToDismiss={{ getSheet: () => ref, onDismiss: () => closeRef?.click() }}
+		></div>
 		{@render children()}
 	</DialogPrimitive.Content>
 </DialogPrimitive.Portal>
