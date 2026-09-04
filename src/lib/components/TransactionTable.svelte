@@ -51,7 +51,7 @@
 	);
 </script>
 
-<section class="rounded-[13px] border border-border bg-panel overflow-hidden">
+<section class="contain-paint rounded-[13px] border border-border bg-panel overflow-hidden">
 	<div class="flex items-center gap-3 border-b border-border px-4 py-3.5 sm:px-4.5 sm:py-4">
 		<div class="text-sm font-semibold tracking-tight">Recent transactions</div>
 		<span class="rounded-md bg-panel-hover px-1.5 py-0.5 font-mono text-[11px] text-subtle">
