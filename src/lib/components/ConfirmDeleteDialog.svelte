@@ -24,7 +24,7 @@
 </script>
 
 <AlertDialog.Root>
-	<AlertDialog.Trigger title={triggerTitle} class={triggerClass}>
+	<AlertDialog.Trigger type="button" title={triggerTitle} class={triggerClass}>
 		{@render trigger()}
 	</AlertDialog.Trigger>
 	<AlertDialog.Content>
