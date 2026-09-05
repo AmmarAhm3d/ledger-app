@@ -9,43 +9,56 @@ export interface DragToDismissOptions {
 
 const SNAP_TRANSITION = 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)';
 
+/** how far back (ms) the rolling velocity window looks, to smooth out single-frame jitter */
+const VELOCITY_WINDOW_MS = 60;
+
 export function dragToDismiss(node: HTMLElement, options: DragToDismissOptions) {
 	let opts = options;
 	let startY = 0;
-	let lastY = 0;
-	let lastTime = 0;
-	let velocity = 0;
 	let dragY = 0;
 	let dragging = false;
 	let sheet: HTMLElement | null = null;
+	let activePointerId: number | null = null;
+	let samples: { y: number; t: number }[] = [];
 
 	function onPointerDown(e: PointerEvent) {
 		if (e.pointerType === 'mouse' && e.button !== 0) return;
+		if (dragging) return;
 		sheet = opts.getSheet() ?? null;
 		if (!sheet) return;
 		dragging = true;
-		startY = lastY = e.clientY;
-		lastTime = performance.now();
-		velocity = 0;
+		activePointerId = e.pointerId;
+		startY = e.clientY;
 		dragY = 0;
+		samples = [{ y: e.clientY, t: performance.now() }];
 		sheet.style.transition = 'none';
 		node.setPointerCapture(e.pointerId);
 	}
 
 	function onPointerMove(e: PointerEvent) {
-		if (!dragging || !sheet) return;
+		if (!dragging || !sheet || e.pointerId !== activePointerId) return;
 		const now = performance.now();
-		const dt = Math.max(1, now - lastTime);
-		velocity = (e.clientY - lastY) / dt;
-		lastY = e.clientY;
-		lastTime = now;
-		dragY = Math.max(0, e.clientY - startY);
+		samples.push({ y: e.clientY, t: now });
+		while (samples.length > 1 && now - samples[0].t > VELOCITY_WINDOW_MS) samples.shift();
+
+		const height = sheet.getBoundingClientRect().height || 1;
+		dragY = Math.min(height, Math.max(0, e.clientY - startY));
 		sheet.style.transform = `translateY(${dragY}px)`;
 	}
 
-	function endDrag() {
-		if (!dragging || !sheet) return;
+	function getVelocity() {
+		if (samples.length < 2) return 0;
+		const first = samples[0];
+		const last = samples[samples.length - 1];
+		const dt = Math.max(1, last.t - first.t);
+		return (last.y - first.y) / dt;
+	}
+
+	function endDrag(e: PointerEvent) {
+		if (!dragging || !sheet || e.pointerId !== activePointerId) return;
 		dragging = false;
+		activePointerId = null;
+		const velocity = getVelocity();
 		const activeSheet = sheet;
 		const height = activeSheet.getBoundingClientRect().height || 1;
 		const pastDistance = dragY > height * (opts.dismissThreshold ?? 0.25);
